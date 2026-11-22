@@ -1,0 +1,3814 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta name="theme-color" content="#f2ede3" />
+  <title>RICOCHET — bank-shot archery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f2ede3;
+      --ink: #191612;
+      --accent: #e2482b;
+      --gold: #d99e13;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Space Mono', monospace;
+      cursor: crosshair;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      display: block;
+    }
+
+    #grain {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      pointer-events: none;
+      opacity: .06;
+      background-size: 180px 180px;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+    }
+
+    /* ---------- HUD ---------- */
+    #hud {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 18px 22px;
+      pointer-events: none;
+    }
+
+    .wordmark {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: 21px;
+      letter-spacing: -.02em;
+      line-height: 1;
+    }
+
+    .wordmark sup {
+      font-size: 9px;
+    }
+
+    #hCourse {
+      font-size: 10px;
+      letter-spacing: .18em;
+      opacity: .55;
+      margin-top: 5px;
+    }
+
+    .hud-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .stat {
+      font-size: 11px;
+      letter-spacing: .08em;
+    }
+
+    .stat .k {
+      opacity: .45;
+      margin-right: 7px;
+    }
+
+    .stat .v {
+      font-weight: 700;
+    }
+
+    #mute,
+    #pauseB {
+      pointer-events: auto;
+      width: 38px;
+      height: 38px;
+      border: 2px solid var(--ink);
+      border-radius: 50%;
+      background: transparent;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background .15s, color .15s, transform .1s;
+    }
+
+    #mute:hover,
+    #pauseB:hover {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    #mute:active,
+    #pauseB:active {
+      transform: scale(.9);
+    }
+
+    #mute svg,
+    #pauseB svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    /* ---------- course tag ---------- */
+    #tag {
+      position: fixed;
+      top: 72px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      z-index: 15;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    #tag .no {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: 42px;
+      letter-spacing: -.02em;
+      line-height: 1;
+    }
+
+    #tag .nm {
+      font-size: 10px;
+      letter-spacing: .28em;
+      opacity: .6;
+      margin-top: 4px;
+    }
+
+    #tag.show {
+      animation: tagA 2s ease forwards;
+    }
+
+    @keyframes tagA {
+      0% {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      12% {
+        opacity: 1;
+        transform: none;
+      }
+
+      78% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+      }
+    }
+
+    /* ---------- overlays ---------- */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(242, 237, 227, .87);
+      transition: opacity .35s ease;
+      padding: 20px;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .kicker {
+      font-size: 11px;
+      letter-spacing: .32em;
+      opacity: .55;
+      margin-bottom: 12px;
+    }
+
+    .menu-inner {
+      text-align: center;
+      transform: rotate(-1.5deg);
+    }
+
+    #menu:not(.hidden) .menu-inner {
+      animation: rise .6s cubic-bezier(.2, .9, .3, 1) both;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: rotate(-1.5deg) translateY(16px);
+      }
+    }
+
+    .menu-inner h1 {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: clamp(56px, 12vw, 116px);
+      line-height: .95;
+      letter-spacing: -.035em;
+    }
+
+    .deco {
+      display: block;
+      margin: 0 auto 6px;
+    }
+
+    .rule {
+      max-width: 380px;
+      margin: 14px auto 18px;
+      font-size: 12.5px;
+      line-height: 1.8;
+      opacity: .75;
+    }
+
+    .rule em {
+      font-style: normal;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .rule .g {
+      color: #a6740a;
+      font-weight: 700;
+      font-style: normal;
+    }
+
+    .rule .b {
+      color: #2b3fbf;
+      font-weight: 700;
+      font-style: normal;
+    }
+
+    /* ---------- mode select ---------- */
+    .modes {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin: 2px 0 16px;
+      flex-wrap: wrap;
+    }
+
+    .modeb {
+      pointer-events: auto;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      background: var(--paper);
+      border: 2.5px solid var(--ink);
+      box-shadow: 5px 5px 0 var(--ink);
+      padding: 15px 16px 13px;
+      width: 200px;
+      text-align: center;
+      transition: transform .12s, box-shadow .12s;
+      color: var(--ink);
+    }
+
+    .modeb:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 7px 7px 0 var(--ink);
+    }
+
+    .modeb:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--ink);
+    }
+
+    .modeb .mt {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: 21px;
+      letter-spacing: -.01em;
+    }
+
+    .modeb .ms {
+      font-size: 9px;
+      letter-spacing: .14em;
+      opacity: .55;
+      margin: 5px 0 10px;
+      min-height: 12px;
+    }
+
+    .pips {
+      display: flex;
+      gap: 5px;
+      justify-content: center;
+      flex-wrap: wrap;
+      max-width: 186px;
+      margin: 0 auto 11px;
+      row-gap: 5px;
+    }
+
+    .pip {
+      display: block;
+      width: 11px;
+      height: 11px;
+      border: 1.5px solid var(--ink);
+      transform: rotate(45deg);
+      opacity: .26;
+    }
+
+    .pip.on {
+      background: var(--accent);
+      opacity: 1;
+    }
+
+    .pip.gold {
+      background: var(--gold);
+    }
+
+    .modeb .go {
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: .1em;
+      border-top: 1px dashed rgba(25, 22, 18, .3);
+      padding-top: 9px;
+      color: var(--accent);
+    }
+
+    .prow {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .pillbtn {
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 10.5px;
+      letter-spacing: .18em;
+      background: var(--paper);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      box-shadow: 3px 3px 0 var(--ink);
+      padding: 9px 16px;
+      transition: transform .12s, box-shadow .12s;
+    }
+
+    .pillbtn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 var(--ink);
+    }
+
+    .pillbtn:active {
+      transform: translate(1px, 1px);
+      box-shadow: 1px 1px 0 var(--ink);
+    }
+
+    .bestline {
+      margin-top: 18px;
+      font-size: 11px;
+      letter-spacing: .18em;
+      opacity: .5;
+    }
+
+    #resetP {
+      margin-top: 12px;
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 9.5px;
+      letter-spacing: .2em;
+      color: var(--ink);
+      opacity: .35;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    @media(max-width:480px) {
+      .modeb {
+        width: 44%;
+        min-width: 152px;
+        padding: 12px 10px 10px;
+      }
+    }
+
+    /* ---------- shared card ---------- */
+    .mapcard {
+      background: var(--paper);
+      border: 3px solid var(--ink);
+      box-shadow: 9px 9px 0 var(--ink);
+      padding: 26px 30px 22px;
+      max-width: min(92vw, 440px);
+      transform: rotate(-1deg);
+      text-align: center;
+    }
+
+    #mapOv:not(.hidden) .mapcard,
+    #statOv:not(.hidden) .mapcard,
+    #slotsOv:not(.hidden) .mapcard,
+    #shareOv:not(.hidden) .mapcard {
+      animation: cardIn .45s cubic-bezier(.2, 1.5, .4, 1) both;
+    }
+
+    #mapGrid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 9px;
+      margin: 8px 0 16px;
+    }
+
+    .mtile {
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      padding: 8px 2px 7px;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      text-align: center;
+      color: var(--ink);
+      transition: transform .1s;
+    }
+
+    .mtile:hover {
+      transform: translateY(-2px);
+    }
+
+    .mtile:active {
+      transform: translateY(1px);
+    }
+
+    .mtile .mn {
+      display: block;
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: 15px;
+      line-height: 1;
+    }
+
+    .mtile .md {
+      display: flex;
+      gap: 3px;
+      justify-content: center;
+      margin-top: 5px;
+    }
+
+    .mtile .md i {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      border: 1px solid var(--ink);
+      opacity: .3;
+    }
+
+    .mtile .md i.on {
+      background: var(--gold);
+      opacity: 1;
+    }
+
+    .mtile.lock {
+      opacity: .25;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .mtile.done {
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+
+    .mapfoot {
+      font-size: 10px;
+      letter-spacing: .2em;
+      opacity: .55;
+      margin-bottom: 16px;
+    }
+
+    /* ---------- workshop ---------- */
+    #edTop {
+      position: fixed;
+      top: 66px;
+      left: 0;
+      right: 0;
+      z-index: 22;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 10px;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+
+    body.editing #edTop {
+      display: flex;
+    }
+
+    .edchip {
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 9.5px;
+      letter-spacing: .12em;
+      padding: 8px 11px;
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+
+    .edchip.ok {
+      background: var(--gold);
+    }
+
+    .edchip.bad {
+      background: var(--accent);
+      color: var(--paper);
+    }
+
+    .edbtn {
+      pointer-events: auto;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 9.5px;
+      letter-spacing: .1em;
+      padding: 8px 12px;
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: 2px 2px 0 var(--ink);
+      transition: transform .1s, box-shadow .1s;
+    }
+
+    .edbtn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+
+    .edbtn:active {
+      transform: translate(1px, 1px);
+      box-shadow: 0 0 0 var(--ink);
+    }
+
+    .edbtn.acc {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    #edTools {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 22;
+      display: none;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 96vw;
+    }
+
+    body.editing #edTools {
+      display: flex;
+    }
+
+    .tbtn {
+      pointer-events: auto;
+      width: 47px;
+      height: 46px;
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      box-shadow: 2px 2px 0 var(--ink);
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 8px;
+      letter-spacing: .06em;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform .08s;
+    }
+
+    .tbtn:active {
+      transform: translateY(1px);
+    }
+
+    .tbtn.on {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .tbtn .ico {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+    }
+
+    .tbtn .ico.f {
+      fill: currentColor;
+      stroke: none;
+    }
+
+    #edProps {
+      position: fixed;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 22;
+      display: none;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 94vw;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      box-shadow: 4px 4px 0 var(--ink);
+      padding: 7px 9px;
+    }
+
+    body.editing #edProps {
+      display: flex;
+    }
+
+    .edmsg {
+      font-size: 9px;
+      letter-spacing: .14em;
+      opacity: .5;
+      padding: 4px 6px;
+    }
+
+    .pbtn {
+      pointer-events: auto;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 9px;
+      letter-spacing: .08em;
+      padding: 6px 10px;
+      border: 1.5px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    .pbtn:active {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .pbtn.warn {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ---------- slots / share ---------- */
+    .slotlist {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin: 8px 0 14px;
+      max-height: 46vh;
+      overflow-y: auto;
+    }
+
+    .srow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 2px solid var(--ink);
+      padding: 7px 9px;
+      text-align: left;
+    }
+
+    .srow b {
+      font-size: 10px;
+      opacity: .45;
+    }
+
+    .srow span {
+      flex: 1;
+      font-size: 10px;
+      letter-spacing: .06em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .srow button {
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 8.5px;
+      letter-spacing: .08em;
+      border: 1.5px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      padding: 4px 7px;
+    }
+
+    .srow button.x {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btnrow {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    #shareTa {
+      width: 100%;
+      height: 110px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      padding: 8px;
+      resize: none;
+      margin: 4px 0 14px;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    /* ---------- pause / win / lose ---------- */
+    .card {
+      position: relative;
+      background: var(--paper);
+      border: 3px solid var(--ink);
+      box-shadow: 9px 9px 0 var(--ink);
+      padding: 32px 42px 28px;
+      text-align: center;
+      transform: rotate(-1.2deg);
+      max-width: min(88vw, 400px);
+    }
+
+    #win:not(.hidden) .card,
+    #lose:not(.hidden) .card,
+    #pauseOv:not(.hidden) .card {
+      animation: cardIn .45s cubic-bezier(.2, 1.5, .4, 1) both;
+    }
+
+    @keyframes cardIn {
+      from {
+        opacity: 0;
+        transform: rotate(-1.2deg) scale(.9);
+      }
+    }
+
+    .card h2 {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: clamp(30px, 8vw, 44px);
+      letter-spacing: -.02em;
+      margin: 2px 0 14px;
+    }
+
+    .pausebtns {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    .cta {
+      display: inline-block;
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: .14em;
+      border: 2.5px solid var(--ink);
+      padding: 13px 32px;
+      border-radius: 999px;
+      background: var(--paper);
+      box-shadow: 4px 4px 0 var(--ink);
+      animation: pulse 1.5s ease-in-out infinite;
+      cursor: pointer;
+    }
+
+    .cta.sec {
+      animation: none;
+      font-size: 11.5px;
+      padding: 11px 26px;
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-4px);
+      }
+    }
+
+    .stars {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 14px;
+      height: 40px;
+    }
+
+    .star {
+      width: 34px;
+      height: 34px;
+      transform: scale(0);
+    }
+
+    #win:not(.hidden) .star {
+      animation: starPop .45s cubic-bezier(.2, 2, .4, 1) forwards;
+    }
+
+    .star:nth-child(2) {
+      animation-delay: .12s;
+    }
+
+    .star:nth-child(3) {
+      animation-delay: .24s;
+    }
+
+    @keyframes starPop {
+      from {
+        transform: scale(0) rotate(-30deg);
+      }
+
+      to {
+        transform: scale(1) rotate(0);
+      }
+    }
+
+    .star path {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 1.6;
+      opacity: .3;
+    }
+
+    .star.on path {
+      fill: var(--accent);
+      opacity: 1;
+    }
+
+    .tally {
+      margin: 4px 0 22px;
+      text-align: left;
+    }
+
+    .tally .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 11.5px;
+      padding: 7px 2px;
+      border-bottom: 1px dashed rgba(25, 22, 18, .25);
+    }
+
+    .tally .row b {
+      font-weight: 700;
+    }
+
+    .tally .row.tot {
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .tally .row.tot b {
+      color: var(--accent);
+      font-size: 15px;
+    }
+
+    .score-grid {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .score-grid .k {
+      display: block;
+      font-size: 10px;
+      letter-spacing: .22em;
+      opacity: .45;
+      margin-bottom: 5px;
+    }
+
+    .score-grid .v {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: 28px;
+    }
+
+    .score-grid .v.acc {
+      color: var(--accent);
+    }
+
+    .stamp {
+      position: absolute;
+      top: -15px;
+      right: -20px;
+      background: var(--accent);
+      color: var(--paper);
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: .14em;
+      padding: 8px 13px;
+      transform: rotate(7deg);
+      box-shadow: 3px 3px 0 var(--ink);
+      display: none;
+    }
+
+    .stamp.show {
+      display: block;
+      animation: stampIn .4s cubic-bezier(.2, 2.2, .4, 1);
+    }
+
+    @keyframes stampIn {
+      from {
+        transform: rotate(7deg) scale(2.4);
+        opacity: 0;
+      }
+
+      to {
+        transform: rotate(7deg) scale(1);
+        opacity: 1;
+      }
+    }
+
+    @media(max-width:560px) {
+      #hud {
+        padding: 14px 16px;
+      }
+
+      .card {
+        padding: 26px 26px 22px;
+      }
+
+      .score-grid {
+        gap: 20px;
+      }
+    }
+
+    /* ---------- achievement toast ---------- */
+    #toast {
+      position: fixed;
+      top: 74px;
+      right: 20px;
+      z-index: 45;
+      pointer-events: none;
+    }
+
+    .tcard {
+      background: var(--paper);
+      border: 2.5px solid var(--ink);
+      box-shadow: 5px 5px 0 var(--ink);
+      padding: 11px 18px 10px;
+      transform: rotate(3deg) translateX(30px) scale(.7);
+      opacity: 0;
+      transition: transform .35s cubic-bezier(.2, 1.6, .4, 1), opacity .3s;
+    }
+
+    #toast.show .tcard {
+      transform: rotate(3deg) translateX(0) scale(1);
+      opacity: 1;
+    }
+
+    .tcard .tk {
+      font-size: 8.5px;
+      letter-spacing: .26em;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+
+    .tcard .tn {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: -.01em;
+    }
+
+    .tcard .td {
+      font-size: 9.5px;
+      opacity: .55;
+      margin-top: 3px;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+  <div id="grain"></div>
+
+  <header id="hud">
+    <div>
+      <div class="wordmark">RICOCHET<sup>®</sup></div>
+      <div id="hCourse">BANK-SHOT ARCHERY</div>
+    </div>
+    <div class="hud-right">
+      <div class="stat"><span class="k">SCORE</span><span class="v" id="hScore">0</span></div>
+      <div class="stat"><span class="k">BEST</span><span class="v" id="hBest">0</span></div>
+      <button id="pauseB" aria-label="Pause">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="5" width="4" height="14" rx="1" />
+          <rect x="14" y="5" width="4" height="14" rx="1" />
+        </svg>
+      </button>
+      <button id="mute" aria-label="Toggle sound">
+        <svg id="icOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M11 5 6 9H3v6h3l5 4V5z" fill="currentColor" stroke="none" />
+          <path d="M15.5 8.6a4.6 4.6 0 0 1 0 6.8" />
+          <path d="M18.2 6a8.4 8.4 0 0 1 0 12" />
+        </svg>
+        <svg id="icOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" style="display:none">
+          <path d="M11 5 6 9H3v6h3l5 4V5z" fill="currentColor" stroke="none" />
+          <path d="m16 9 5 6M21 9l-5 6" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="tag">
+    <div class="no" id="tagNo"></div>
+    <div class="nm" id="tagNm"></div>
+  </div>
+
+  <div id="toast">
+    <div class="tcard">
+      <div class="tk">STAMP EARNED</div>
+      <div class="tn" id="tName">—</div>
+      <div class="td" id="tDesc">—</div>
+    </div>
+  </div>
+
+  <!-- ======== WORKSHOP chrome ======== -->
+  <div id="edTop">
+    <span class="edchip" id="edChip">—</span>
+    <button class="edbtn acc" id="edTest">▶ TEST</button>
+    <button class="edbtn" id="edUndo">UNDO</button>
+    <button class="edbtn" id="edAm">−</button>
+    <span class="edchip" id="edArN">3 ARROWS</span>
+    <button class="edbtn" id="edAp">+</button>
+    <button class="edbtn" id="edSlots">SLOTS</button>
+    <button class="edbtn" id="edShare">SHARE</button>
+    <button class="edbtn" id="edClear">CLEAR</button>
+    <button class="edbtn" id="edExit">EXIT</button>
+  </div>
+  <div id="edTools"></div>
+  <div id="edProps"><span class="edmsg">PICK A TOOL BELOW — TAP THE SHEET TO PLACE</span></div>
+
+  <div id="menu" class="overlay">
+    <div class="menu-inner">
+      <svg class="deco" width="64" height="48" viewBox="0 0 64 48" fill="none" stroke="#191612" stroke-width="2.4"
+        stroke-linecap="round">
+        <path d="M14 6c16 8 16 28 0 36" />
+        <line x1="14" y1="6" x2="14" y2="42" />
+        <line x1="14" y1="24" x2="50" y2="24" />
+        <path d="M60 24 50 19v10l10-5Z" fill="#191612" stroke="none" />
+        <path d="M21 24l-5-6M21 24l-5 6" />
+      </svg>
+      <div class="kicker">A BANK-SHOT ARCHERY PUZZLE GAME</div>
+      <h1>RICOCHET</h1>
+      <p class="rule">Drag back, release, bank into the target. Snipe <span class="g">coins</span> to arm a <span
+          class="g">piercing arrow</span>. <span class="b">Wells</span> bend your arc, <span class="b">wind</span>
+        pushes it, <span class="b">portals</span> fold the level, <em>crates</em> shatter open. Build your own in the
+        <em>workshop</em> — the solver watches over your shoulder.
+      </p>
+      <div class="modes">
+        <button class="modeb" id="tourBtn">
+          <div class="mt">THE TOUR</div>
+          <div class="ms" id="tourSub">20 HANDCRAFTED PUZZLES</div>
+          <div class="pips" id="tourPips"></div>
+          <div class="go" id="tourGo">BEGIN — Nº01</div>
+        </button>
+        <button class="modeb" id="infBtn">
+          <div class="mt">INFINITE</div>
+          <div class="ms" id="infSub">ENDLESS · SOLVER-VERIFIED</div>
+          <div class="pips" id="infMark"></div>
+          <div class="go" id="infGo">DESCEND — DEPTH 01</div>
+        </button>
+      </div>
+      <div class="prow">
+        <button class="pillbtn" id="dailyBtn">PUZZLE OF THE DAY</button>
+        <button class="pillbtn" id="workBtn">WORKSHOP</button>
+        <button class="pillbtn" id="mapBtn">PUZZLE INDEX</button>
+        <button class="pillbtn" id="statBtn">STUDIO LOG</button>
+      </div>
+      <div class="bestline">BEST — <span id="menuBest">0</span> &nbsp;·&nbsp; STARS — <span id="menuStars">0</span>
+        &nbsp;·&nbsp; STAMPS — <span id="menuAch">0/13</span></div>
+      <button id="resetP">RESET PROGRESS</button>
+    </div>
+  </div>
+
+  <div id="mapOv" class="overlay hidden">
+    <div class="mapcard">
+      <div class="kicker">THE TOUR — PUZZLE INDEX</div>
+      <div id="mapGrid"></div>
+      <div class="mapfoot" id="mapFoot"></div>
+      <div class="cta sec" id="mapClose">CLOSE</div>
+    </div>
+  </div>
+
+  <div id="statOv" class="overlay hidden">
+    <div class="mapcard">
+      <div class="kicker">STUDIO LOG — LIFETIME</div>
+      <div class="tally" id="statList" style="margin:8px 0 18px"></div>
+      <div class="cta sec" id="statClose">CLOSE</div>
+    </div>
+  </div>
+
+  <div id="slotsOv" class="overlay hidden">
+    <div class="mapcard">
+      <div class="kicker">WORKSHOP — BUILD SLOTS</div>
+      <div class="slotlist" id="slotList"></div>
+      <div class="btnrow">
+        <div class="cta sec" id="slotSave">SAVE CURRENT</div>
+        <div class="cta sec" id="slotImport">IMPORT A CODE</div>
+      </div>
+      <div class="cta sec" id="slotClose" style="margin-top:10px">CLOSE</div>
+    </div>
+  </div>
+
+  <div id="shareOv" class="overlay hidden">
+    <div class="mapcard">
+      <div class="kicker" id="shareKick">SHARE CODE</div>
+      <textarea id="shareTa" readonly spellcheck="false"></textarea>
+      <div class="btnrow">
+        <div class="cta sec" id="shareCopy">COPY</div>
+        <div class="cta sec" id="shareImport">LOAD THIS CODE</div>
+      </div>
+      <div class="cta sec" id="shareClose" style="margin-top:10px">CLOSE</div>
+    </div>
+  </div>
+
+  <div id="pauseOv" class="overlay hidden">
+    <div class="card">
+      <div class="kicker">INTERMISSION</div>
+      <h2>PAUSED</h2>
+      <div class="pausebtns">
+        <div class="cta" id="pResume">RESUME</div>
+        <div class="cta sec" id="pHint">SHOW A LINE — H</div>
+        <div class="cta sec" id="pRestart">RESTART PUZZLE</div>
+        <div class="cta sec" id="pMap">PUZZLE INDEX</div>
+        <div class="cta sec" id="pCalm">MOTION: FULL</div>
+        <div class="cta sec" id="pQuit">QUIT TO MENU</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="win" class="overlay hidden">
+    <div class="card">
+      <div class="stamp" id="wStamp">NEW BEST</div>
+      <div class="kicker" id="wKick">COURSE CLEAR</div>
+      <h2 id="wTitle">BULLSEYE</h2>
+      <div class="stars" id="wStars"></div>
+      <div class="tally">
+        <div class="row"><span>SHOTS USED</span><b id="wShots">1</b></div>
+        <div class="row"><span>BANK BONUS</span><b id="wBank">—</b></div>
+        <div class="row"><span>COIN CHAIN</span><b id="wChain">×0</b></div>
+        <div class="row"><span>ARROWS SPARED</span><b id="wSpared">+0</b></div>
+        <div class="row tot"><span>SCORE</span><b id="wPts">+0</b></div>
+        <div class="row tot"><span>TOTAL</span><b id="wTotal">0</b></div>
+      </div>
+      <div class="cta" id="wCta">NEXT COURSE</div>
+    </div>
+  </div>
+
+  <div id="lose" class="overlay hidden">
+    <div class="card">
+      <div class="stamp" id="lStamp">NEW BEST</div>
+      <div class="kicker" id="lKick">OUT OF ARROWS</div>
+      <h2 id="lTitle">QUIVER EMPTY</h2>
+      <p class="rule" id="lRule" style="margin-bottom:18px">The target stands untouched — your misses are inked on the
+        sheet. <em>Bank off the walls</em> and loose again.</p>
+      <div class="score-grid">
+        <div><span class="k" id="lScoreK">SCORE</span><span class="v acc" id="lScore">0</span></div>
+        <div><span class="k" id="lDepthK">COURSE</span><span class="v" id="lCourse">01</span></div>
+        <div id="lBestWrap"><span class="k" id="lBestK">BEST DEPTH</span><span class="v" id="lBestD">—</span></div>
+      </div>
+      <div class="cta" id="lCta">RETRY COURSE</div>
+      <div class="cta sec" id="lWork" style="margin-top:10px;display:none">BACK TO WORKSHOP</div>
+      <div class="cta sec" id="lCopy" style="margin-top:10px;display:none">COPY RESULT</div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+    /* ================= canvas & globals ================= */
+    const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+    const TAU = Math.PI * 2;
+    const PAPER = '#f2ede3', INK = '#191612', ACC = '#e2482b', BLUE = '#2b3fbf', GOLD = '#d99e13', GOLDD = '#a6740a';
+    let W = 0, H = 0, U = 0, K = 1, AR = 5, g = 0, vmax = 0;
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      U = Math.min(W, H); K = U / 640;
+      g = 1.7 * U;
+      /* Speed derives from the screen DIAGONAL so the whole playfield
+         stays inside the parabola-of-safety on every aspect ratio. */
+      vmax = 1.25 * Math.hypot(W, H);
+      AR = 4.5 * Math.max(K, 0.8);
+      cv.width = W * dpr; cv.height = H * dpr;
+      cv.style.width = W + 'px'; cv.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bow.x = Math.max(W * 0.1, 80); bow.y = H * 0.84;
+      splats.length = 0;
+      if (courseDef) layoutCourse();
+    }
+    /* RNG indirection — the generator draws through rand() so the daily
+       puzzle can swap in a seeded PRNG and reproduce the same layout. */
+    let RNGF = Math.random;
+    const rand = (a, b) => RNGF() * (b - a) + a;
+    function seededRand(seed) {
+      let s = seed >>> 0;
+      return function () {
+        s |= 0; s = (s + 0x6D2B79F5) | 0;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function withRNG(rng, fn) { const old = RNGF; RNGF = rng; try { return fn(); } finally { RNGF = old; } }
+    const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const pad = n => String(n).padStart(2, '0');
+    const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+    function angLerp(a, b, t) { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return a + d * t; }
+    const store = {
+      get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+      set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+    };
+    function vib(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { } }
+
+    /* ================= synth audio ================= */
+    let AC = null, master = null, muted = store.get('ric_muted') === '1';
+    function audio() {
+      if (!AC)
+      {
+        const A = window.AudioContext || window.webkitAudioContext; if (!A) return;
+        AC = new A(); master = AC.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(AC.destination);
+      }
+      if (AC.state === 'suspended') AC.resume();
+    }
+    function tone(freq, dur, type, vol, slideTo, delay) {
+      if (!AC) return; const t0 = AC.currentTime + (delay || 0);
+      const o = AC.createOscillator(), gn = AC.createGain();
+      o.type = type || 'triangle'; o.frequency.setValueAtTime(freq, t0);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t0 + dur);
+      gn.gain.setValueAtTime(0.0001, t0);
+      gn.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(gn); gn.connect(master); o.start(t0); o.stop(t0 + dur + 0.03);
+    }
+    function noiseBurst(dur, freq, vol, type, delay) {
+      if (!AC) return; const t0 = AC.currentTime + (delay || 0);
+      const len = Math.max(1, (dur * AC.sampleRate) | 0), buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++)d[ i ] = Math.random() * 2 - 1;
+      const src = AC.createBufferSource(); src.buffer = buf;
+      const f = AC.createBiquadFilter(); f.type = type || 'bandpass'; f.frequency.value = freq;
+      const gn = AC.createGain(); gn.gain.setValueAtTime(vol, t0); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(f); f.connect(gn); gn.connect(master); src.start(t0);
+    }
+    const COIN_STEPS = [ 0, 4, 7, 12, 16, 19, 24, 28 ];
+    const sfx = {
+      ui() { tone(660, 0.06, 'triangle', 0.08); },
+      draw() { tone(190, 0.09, 'sawtooth', 0.03, 150); },
+      tick2() { tone(880, 0.03, 'square', 0.03); },
+      release(p) { tone(150 + 120 * p, 0.12, 'sawtooth', 0.16, 60); noiseBurst(0.08, 1800, 0.08, 'highpass'); },
+      wall(v) { noiseBurst(0.07, 300, 0.08 + 0.2 * v, 'lowpass'); tone(90, 0.06, 'sine', 0.08 + 0.12 * v); },
+      wood(v) { noiseBurst(0.06, 700 + 500 * v, 0.1 + 0.16 * v, 'bandpass'); tone(240, 0.05, 'triangle', 0.08); },
+      clank() { tone(320, 0.06, 'square', 0.06, 240); noiseBurst(0.04, 2400, 0.05, 'highpass'); },
+      ding() { const f = rand(700, 900); tone(f, 0.2, 'sine', 0.14); tone(f * 2, 0.12, 'sine', 0.05); },
+      thunk() { noiseBurst(0.05, 240, 0.14, 'lowpass'); tone(120, 0.06, 'sine', 0.1, 80); },
+      slow() { tone(620, 0.4, 'sine', 0.1, 140); },
+      coin(ch) {
+        const st = COIN_STEPS[ Math.min(ch - 1, 7) ], f = 660 * Math.pow(2, st / 12);
+        tone(f, 0.16, 'triangle', 0.14); tone(f * 2, 0.09, 'sine', 0.05);
+      },
+      charge() { tone(880, 0.1, 'triangle', 0.12); tone(1320, 0.16, 'triangle', 0.1, null, 0.08); },
+      portal() { tone(220, 0.28, 'sine', 0.12, 880); noiseBurst(0.2, 1800, 0.05, 'highpass'); },
+      slice() { noiseBurst(0.07, 2600, 0.09, 'highpass'); tone(760, 0.06, 'square', 0.05, 320); },
+      wind() { noiseBurst(0.3, 500, 0.06, 'lowpass'); },
+      well() { tone(150, 0.5, 'sine', 0.07, 90); },
+      crate() {
+        noiseBurst(0.1, 420, 0.2, 'bandpass'); noiseBurst(0.07, 1500, 0.12, 'highpass');
+        tone(150, 0.12, 'square', 0.1, 55);
+      },
+      stamp() { tone(520, 0.07, 'square', 0.09); tone(784, 0.12, 'triangle', 0.12, null, 0.07); },
+      chalk() { tone(1200, 0.05, 'square', 0.05); tone(900, 0.09, 'triangle', 0.07, null, 0.05); },
+      place() { tone(500, 0.05, 'square', 0.07); tone(740, 0.07, 'triangle', 0.08, null, 0.04); },
+      target(b) {
+        [ 523, 659, 784, 1046 ].forEach((f, i) => tone(f, 0.14, 'triangle', 0.16, null, i * 0.055));
+        if (b >= 1) tone(1318, 0.25, 'sine', 0.1, null, 0.25); noiseBurst(0.3, 6000, 0.04, 'highpass', 0.05);
+      },
+      fanfare() { [ 392, 494, 587, 784 ].forEach((f, i) => tone(f, 0.16, 'triangle', 0.13, null, i * 0.09)); },
+      empty() { tone(240, 0.25, 'sawtooth', 0.1, 170); tone(180, 0.3, 'sawtooth', 0.08, 120, 0.12); }
+    };
+
+    /* ================= achievements — STAMPS ================= */
+    const ACH = [
+      { id: 'bank', n: 'FIRST BANK', d: 'Finish a shot off a bounce' },
+      { id: 'bank3', n: 'TRIPLE BANK', d: 'Clear with 3+ banks' },
+      { id: 'chain3', n: 'FULL STRING', d: 'Chain 3 coins in one flight' },
+      { id: 'arm', n: 'ARMORER', d: 'Charge the piercing arrow' },
+      { id: 'breach', n: 'BREACH', d: 'Pierce through to the bullseye' },
+      { id: 'demo', n: 'DEMOLITION', d: 'Shatter a crate' },
+      { id: 'worm', n: 'WORMHOLED', d: 'Score through a portal' },
+      { id: 'sling', n: 'SLINGSHOT', d: 'Curve a winner through a well' },
+      { id: 'grad', n: 'GRADUATE', d: 'Complete the 20-puzzle tour' },
+      { id: 'depth10', n: 'SPELUNKER', d: 'Reach depth 10 in INFINITE' },
+      { id: 'sharp', n: 'SHARPSHOOTER', d: 'Perfect 5 puzzles (3★)' },
+      { id: 'daily', n: 'REGULAR', d: 'Clear a puzzle of the day' },
+      { id: 'maker', n: 'GAME WRIGHT', d: 'Playtest-clear a workshop build' }
+    ];
+    let ach = new Set();
+    try { ach = new Set(JSON.parse(store.get('ric_ach') || '[]')); } catch (e) { }
+    function saveAch() { store.set('ric_ach', JSON.stringify([ ...ach ])); }
+    let tq = [], tOn = false;
+    function award(id) {
+      if (ach.has(id)) return;
+      ach.add(id); saveAch();
+      const d = ACH.find(a => a.id === id); if (!d) return;
+      tq.push(d); pumpToast(); updateMenuText();
+    }
+    function pumpToast() {
+      if (tOn || !tq.length) return;
+      tOn = true; const d = tq.shift();
+      document.getElementById('tName').textContent = d.n;
+      document.getElementById('tDesc').textContent = d.d;
+      toastEl.classList.add('show'); sfx.stamp();
+      setTimeout(() => {
+        toastEl.classList.remove('show');
+        setTimeout(() => { tOn = false; pumpToast(); }, 420);
+      }, 2300);
+    }
+
+    /* ================= studio log ================= */
+    let stats = { shots: 0, hits: 0, banks: 0, coins: 0, crates: 0, portals: 0, pierces: 0, hints: 0, dailys: 0 };
+    try { const s = JSON.parse(store.get('ric_stats') || 'null'); if (s) stats = Object.assign(stats, s); } catch (e) { }
+    function saveStats() { store.set('ric_stats', JSON.stringify(stats)); }
+
+    /* ================= THE TOUR — 20 handcrafted puzzles =================
+       ACT I (Nº01–10): one new idea per puzzle.
+       ACT II (Nº11–20): escalates each idea, then combines them.        */
+    const COURSES = [
+      {
+        name: 'FIRST FLIGHT', par: 1, arrows: 3, target: { x: .74, y: .26 },
+        coins: [ { x: .4, y: .6 }, { x: .52, y: .46 }, { x: .63, y: .36 } ], obs: []
+      },
+      {
+        name: 'OVER THE WALL', par: 1, arrows: 3, target: { x: .78, y: .24 },
+        coins: [ { x: .44, y: .18 }, { x: .56, y: .24 }, { x: .68, y: .3 } ],
+        obs: [ { t: 'plank', x: .46, y: .52, w: .035, h: .52, a: 0 } ]
+      },
+      {
+        name: 'PINBALL', par: 2, arrows: 3, target: { x: .82, y: .2 },
+        coins: [ { x: .5, y: .34 }, { x: .58, y: .42 }, { x: .44, y: .44 } ],
+        obs: [ { t: 'bump', x: .5, y: .5, r: .075 }, { t: 'bump', x: .66, y: .32, r: .055 }, { t: 'bump', x: .36, y: .3, r: .055 } ]
+      },
+      {
+        name: 'THE SHELF', par: 2, arrows: 3, target: { x: .8, y: .6 },
+        coins: [ { x: .4, y: .5 }, { x: .5, y: .55 }, { x: .58, y: .6 } ],
+        obs: [ { t: 'plank', x: .72, y: .33, w: .44, h: .035, a: 0 }, { t: 'bump', x: .45, y: .78, r: .06 } ]
+      },
+      {
+        name: 'WINDMILL', par: 2, arrows: 3, target: { x: .84, y: .2 },
+        coins: [ { x: .55, y: .2 }, { x: .72, y: .45 }, { x: .4, y: .5 } ],
+        obs: [ { t: 'spin', x: .55, y: .45, len: .28, sp: 1.5 }, { t: 'bump', x: .3, y: .62, r: .05 } ]
+      },
+      {
+        name: 'ELEVATOR', par: 2, arrows: 3, target: { x: .82, y: .22 },
+        coins: [ { x: .62, y: .38 }, { x: .62, y: .6 } ],
+        obs: [ { t: 'move', x: .5, y: .5, w: .34, h: .035, ax: 'y', range: .15, sp: 1.2 },
+        { t: 'plank', x: .2, y: .4, w: .035, h: .34, a: 0 }, { t: 'bump', x: .66, y: .52, r: .06 } ]
+      },
+      {
+        name: 'BILLIARDS', par: 2, arrows: 4, target: { x: .14, y: .2 },
+        coins: [ { x: .4, y: .35 }, { x: .55, y: .55 }, { x: .3, y: .45 } ],
+        obs: [ { t: 'bump', x: .45, y: .5, r: .07 }, { t: 'bump', x: .62, y: .35, r: .05 }, { t: 'bump', x: .6, y: .68, r: .05 },
+        { t: 'plank', x: .82, y: .55, w: .035, h: .4, a: 0 } ]
+      },
+      {
+        name: 'CROSSDRAFT', par: 2, arrows: 3, target: { x: .8, y: .16 },
+        coins: [ { x: .46, y: .5 }, { x: .45, y: .38 }, { x: .47, y: .27 } ],
+        obs: [ { t: 'wind', x: .38, y: .2, w: .17, h: .56, kx: 0, ky: -0.95 },
+        { t: 'bump', x: .63, y: .62, r: .05 }, { t: 'bump', x: .66, y: .34, r: .045 } ]
+      },
+      {
+        name: 'WORMHOLE', par: 2, arrows: 3, target: { x: .87, y: .16 },
+        coins: [ { x: .6, y: .42 }, { x: .66, y: .36 } ],
+        obs: [ { t: 'portal', ax: .3, ay: .68, bx: .72, by: .32, r: .07 },
+        { t: 'plank', x: .86, y: .5, w: .035, h: .42, a: 0 },
+        { t: 'bump', x: .52, y: .55, r: .05 } ]
+      },
+      {
+        name: 'GAUNTLET', par: 3, arrows: 5, target: { x: .84, y: .2 },
+        coins: [ { x: .3, y: .55 }, { x: .68, y: .3 }, { x: .45, y: .8 } ],
+        obs: [ { t: 'spin', x: .5, y: .3, len: .26, sp: 2.1 }, { t: 'move', x: .5, y: .62, w: .3, h: .035, ax: 'x', range: .16, sp: 1.4 },
+        { t: 'bump', x: .24, y: .42, r: .055 }, { t: 'bump', x: .68, y: .78, r: .055 }, { t: 'plank', x: .86, y: .52, w: .035, h: .3, a: 0 } ]
+      },
+      {
+        name: 'MOVING TARGET', par: 2, arrows: 3, target: { x: .5, y: .22, mx: .18, sp: 1.1 },
+        coins: [ { x: .4, y: .36 }, { x: .6, y: .36 } ],
+        obs: [ { t: 'bump', x: .3, y: .5, r: .06 }, { t: 'bump', x: .7, y: .5, r: .06 } ]
+      },
+      {
+        name: 'TWIN MILLS', par: 2, arrows: 4, target: { x: .5, y: .16 },
+        coins: [ { x: .5, y: .35 }, { x: .42, y: .6 }, { x: .6, y: .6 } ],
+        obs: [ { t: 'spin', x: .32, y: .42, len: .24, sp: 1.8 }, { t: 'spin', x: .68, y: .42, len: .24, sp: -1.8 }, { t: 'bump', x: .5, y: .7, r: .06 } ]
+      },
+      {
+        name: 'GOLD RUSH', par: 2, arrows: 3, target: { x: .84, y: .46 },
+        coins: [ { x: .3, y: .62 }, { x: .38, y: .52 }, { x: .47, y: .45 }, { x: .56, y: .42 }, { x: .66, y: .43 }, { x: .75, y: .48 } ],
+        obs: [ { t: 'plank', x: .62, y: .66, w: .4, h: .035, a: 0 }, { t: 'bump', x: .44, y: .78, r: .06 }, { t: 'bump', x: .7, y: .3, r: .05 } ]
+      },
+      {
+        name: 'THE WINDOW', par: 2, arrows: 3, target: { x: .78, y: .32 },
+        coins: [ { x: .42, y: .35 }, { x: .6, y: .22 }, { x: .72, y: .3 } ],
+        obs: [ { t: 'plank', x: .42, y: .14, w: .035, h: .28, a: 0 },
+        { t: 'plank', x: .42, y: .71, w: .035, h: .56, a: 0 }, { t: 'bump', x: .24, y: .55, r: .05 } ]
+      },
+      {
+        name: 'CROSSFIRE', par: 3, arrows: 4, target: { x: .5, y: .14, mx: .14, sp: 1.0 },
+        coins: [ { x: .28, y: .45 }, { x: .72, y: .45 }, { x: .5, y: .35 } ],
+        obs: [ { t: 'wind', x: .16, y: .28, w: .2, h: .5, kx: 0.85, ky: 0 },
+        { t: 'wind', x: .64, y: .28, w: .2, h: .5, kx: -0.85, ky: 0 },
+        { t: 'well', x: .5, y: .8, f: 2.2, R: .28 },
+        { t: 'spin', x: .5, y: .58, len: .2, sp: 1.6 } ]
+      },
+      {
+        name: 'DOUBLE MOVE', par: 2, arrows: 3, target: { x: .82, y: .62 },
+        coins: [ { x: .55, y: .68 }, { x: .68, y: .8 } ],
+        obs: [ { t: 'plank', x: .72, y: .38, w: .4, h: .035, a: 0 },
+        { t: 'move', x: .45, y: .5, w: .3, h: .035, ax: 'y', range: .12, sp: 1.2 },
+        { t: 'crate', x: .82, y: .44, w: .055, h: .055, a: 0.2 }, { t: 'bump', x: .35, y: .8, r: .06 } ]
+      },
+      {
+        name: 'UPDRAFT', par: 2, arrows: 3, target: { x: .84, y: .16 },
+        coins: [ { x: .51, y: .5 }, { x: .51, y: .34 }, { x: .51, y: .2 } ],
+        obs: [ { t: 'plank', x: .64, y: .64, w: .035, h: .66, a: 0 },
+        { t: 'wind', x: .44, y: .14, w: .15, h: .6, kx: 0, ky: -1.1 }, { t: 'bump', x: .26, y: .55, r: .05 } ]
+      },
+      {
+        name: 'SWAP', par: 2, arrows: 3, target: { x: .87, y: .16 },
+        coins: [ { x: .28, y: .5 }, { x: .6, y: .4 }, { x: .8, y: .42 } ],
+        obs: [ { t: 'plank', x: .68, y: .55, w: .035, h: .62, a: 0 },
+        { t: 'portal', ax: .28, ay: .72, bx: .84, by: .3, r: .07 },
+        { t: 'spin', x: .46, y: .45, len: .2, sp: 1.8 } ]
+      },
+      {
+        name: 'BOOT CAMP', par: 3, arrows: 4, target: { x: .8, y: .18 },
+        coins: [ { x: .3, y: .6 }, { x: .5, y: .35 }, { x: .66, y: .5 } ],
+        obs: [ { t: 'move', x: .5, y: .6, w: .3, h: .035, ax: 'x', range: .15, sp: 1.3 },
+        { t: 'wind', x: .62, y: .2, w: .14, h: .34, kx: -0.8, ky: 0 },
+        { t: 'bump', x: .36, y: .44, r: .055 }, { t: 'bump', x: .7, y: .66, r: .05 } ]
+      },
+      {
+        name: 'THE EXAM', par: 4, arrows: 6, target: { x: .58, y: .15, mx: .12, sp: 1.15 },
+        coins: [ { x: .22, y: .3 }, { x: .64, y: .3 }, { x: .78, y: .2 } ],
+        obs: [ { t: 'plank', x: .3, y: .58, w: .035, h: .46, a: 0 },
+        { t: 'spin', x: .48, y: .4, len: .2, sp: 2.2 },
+        { t: 'well', x: .52, y: .78, f: 2.5, R: .28 },
+        { t: 'crate', x: .58, y: .33, w: .06, h: .06, a: -0.15 },
+        { t: 'move', x: .66, y: .62, w: .26, h: .035, ax: 'y', range: .12, sp: 1.4 },
+        { t: 'portal', ax: .14, ay: .42, bx: .8, by: .34, r: .07 },
+        { t: 'bump', x: .22, y: .78, r: .05 }, { t: 'bump', x: .86, y: .6, r: .05 } ]
+      }
+    ];
+    const TOUR_LEN = COURSES.length;
+    const cloneDef = d => ({
+      name: d.name, par: d.par, arrows: d.arrows,
+      target: Object.assign({}, d.target),
+      coins: (d.coins || []).map(c => ({ x: c.x, y: c.y })),
+      obs: d.obs.map(o => Object.assign({}, o)), paths: d.paths
+    });
+
+    /* ---- layout builder (shared by game + solver + editor) ---- */
+    function buildLayout(def) {
+      const list = [];
+      for (const o of def.obs)
+      {
+        if (o.t === 'plank') list.push({ t: 'plank', x: o.x * W, y: o.y * H, w: o.w * U, h: o.h * U, a: o.a || 0 });
+        else if (o.t === 'crate') list.push({ t: 'crate', x: o.x * W, y: o.y * H, w: o.w * U, h: o.h * U, a: o.a || 0, dead: false });
+        else if (o.t === 'move') list.push({
+          t: 'move', bx: o.x * W, by: o.y * H, x: o.x * W, y: o.y * H, w: o.w * U, h: o.h * U,
+          ax: o.ax, range: o.range * U, sp: o.sp, ph: o.ph || 0, a: 0, pulse: 0
+        });
+        else if (o.t === 'spin') list.push({ t: 'spin', x: o.x * W, y: o.y * H, len: o.len * U, th: 15 * K, sp: o.sp, ph: o.ph || 0, ang: o.ph || 0 });
+        else if (o.t === 'bump') list.push({ t: 'bump', x: o.x * W, y: o.y * H, r: o.r * U, cd: 0, pulse: 0 });
+        else if (o.t === 'wind') list.push({ t: 'wind', x: o.x * W, y: o.y * H, w: o.w * W, h: o.h * H, kx: o.kx || 0, ky: o.ky || 0 });
+        else if (o.t === 'well') list.push({ t: 'well', x: o.x * W, y: o.y * H, f: o.f, R: o.R * U });
+        else if (o.t === 'portal') list.push({ t: 'portal', ax: o.ax * W, ay: o.ay * H, bx: o.bx * W, by: o.by * H, r: o.r * U });
+      }
+      const t = def.target;
+      return {
+        obs: list, target: {
+          bx: t.x * W, by: t.y * H, x: t.x * W, y: t.y * H, r: clamp(0.115 * U, 36, 62),
+          mx: (t.mx || 0) * U, sp: t.sp || 0, pulse: 0
+        }
+      };
+    }
+
+    function safeTargetSpot() {
+      const apex = vmax * vmax / (2 * g);
+      const rise = Math.min(apex * 0.45, 0.62 * H);
+      const x = 0.55 * W;
+      const d = Math.abs(x - bow.x);
+      const maxRise = apex - g * d * d / (2 * vmax * vmax);
+      const y = Math.max(0.2 * H, bow.y - Math.min(rise, maxRise * 0.8));
+      return { x: x / W, y: y / H };
+    }
+
+    /* ================= INFINITE — procedural generator ================= */
+    function rollInfinite(d) {
+      const target = { x: rand(0.3, 0.84), y: rand(0.16, 0.4) };
+      if (d >= 3 && d % 3 === 0) { target.mx = rand(0.08, 0.14); target.sp = rand(0.8, 1.1 + Math.min(0.5, d * 0.04)); }
+      const obs = [], taken = [ { x: target.x, y: target.y, r: 0.2 }, { x: 0.1, y: 0.84, r: 0.14 } ];
+      const place = r => {
+        for (let i = 0; i < 50; i++)
+        {
+          const x = rand(0.2, 0.8), y = rand(0.24, 0.72);
+          if (taken.every(t => Math.hypot(x - t.x, y - t.y) > t.r + r)) return { x, y };
+        } return null;
+      };
+      if (d >= 3 && rand(0, 1) < Math.min(0.5, 0.3 + d * 0.02))
+      {
+        const horiz = rand(0, 1) < 0.5, ww = horiz ? rand(0.18, 0.26) : 0.14, wh = horiz ? 0.14 : rand(0.2, 0.3);
+        const wx = clamp(rand(0.26, 0.58), 0.16, 0.84 - ww), wy = clamp(rand(0.24, 0.5), 0.18, 0.72 - wh);
+        const k = rand(0.55, 0.9) + Math.min(0.35, d * 0.02);
+        obs.push({
+          t: 'wind', x: wx, y: wy, w: ww, h: wh,
+          kx: horiz ? (rand(0, 1) < 0.5 ? 1 : -1) * k : 0,
+          ky: horiz ? 0 : (rand(0, 1) < 0.5 ? 1 : -1) * k
+        });
+        taken.push({ x: wx + ww / 2, y: wy + wh / 2, r: 0.16 });
+      }
+      if (d >= 6 && rand(0, 1) < Math.min(0.45, 0.25 + d * 0.02))
+      {
+        const pa = { x: rand(0.18, 0.36), y: rand(0.55, 0.75) }, pb = { x: rand(0.58, 0.82), y: rand(0.16, 0.38) };
+        if ([ pa, pb ].every(p => taken.every(t => Math.hypot(p.x - t.x, p.y - t.y) > t.r + 0.1)))
+        {
+          obs.push({ t: 'portal', ax: pa.x, ay: pa.y, bx: pb.x, by: pb.y, r: 0.07 });
+          taken.push({ x: pa.x, y: pa.y, r: 0.11 }, { x: pb.x, y: pb.y, r: 0.11 });
+        }
+      }
+      if (d >= 7 && rand(0, 1) < 0.35)
+      {
+        const p = place(0.17);
+        if (p)
+        {
+          obs.push({ t: 'well', x: p.x, y: p.y, f: rand(2.2, 3.2), R: rand(0.26, 0.34) });
+          taken.push({ x: p.x, y: p.y, r: 0.3 });
+        }
+      }
+      const nb = Math.min(2 + (d % 3) + Math.floor(d / 6), 5);
+      for (let i = 0; i < nb; i++)
+      {
+        const p = place(0.09);
+        if (p) { obs.push({ t: 'bump', x: p.x, y: p.y, r: rand(0.05, 0.075) }); taken.push({ x: p.x, y: p.y, r: 0.12 }); }
+      }
+      const nspin = d < 2 ? 0 : (d >= 9 && rand(0, 1) < 0.5 ? 2 : 1);
+      for (let i = 0; i < nspin; i++)
+      {
+        const p = place(0.12);
+        if (p) obs.push({
+          t: 'spin', x: p.x, y: p.y, len: rand(0.2, 0.28),
+          sp: (rand(0, 1) < 0.5 ? -1 : 1) * (1.3 + Math.min(1.7, d * 0.11)), ph: rand(0, 6)
+        });
+      }
+      const np = Math.min(1 + Math.floor(d / 5), 3);
+      for (let i = 0; i < np; i++)
+      {
+        const p = place(0.12);
+        if (p) obs.push({ t: 'plank', x: p.x, y: p.y, w: rand(0.18, 0.3), h: 0.035, a: [ 0, Math.PI / 2, 0.6, -0.6 ][ (rand(0, 4)) | 0 ] });
+      }
+      if (d >= 4 && rand(0, 1) < 0.45)
+      {
+        const p = place(0.1);
+        if (p)
+        {
+          obs.push({
+            t: 'crate', x: p.x, y: p.y, w: rand(0.05, 0.07), h: rand(0.05, 0.07),
+            a: rand(-0.3, 0.3)
+          }); taken.push({ x: p.x, y: p.y, r: 0.1 });
+        }
+      }
+      if (d >= 5 && rand(0, 1) < 0.55)
+      {
+        const p = place(0.12);
+        if (p) obs.push({
+          t: 'move', x: p.x, y: p.y, w: 0.3, h: 0.035, ax: rand(0, 1) < 0.5 ? 'x' : 'y',
+          range: rand(0.1, 0.16), sp: rand(0.9, 1.5), ph: rand(0, 6)
+        });
+      }
+      return { name: 'ENDLESS', par: d >= 8 ? 3 : 2, arrows: (d < 5 || d % 5 === 0) ? 4 : 3, target, obs };
+    }
+    function clearOfObs(def, px, py, m) {
+      for (const o of def.obs)
+      {
+        if (o.t === 'plank' || o.t === 'move')
+        {
+          if (Math.abs(px - o.x) < (o.w / 2 + m) && Math.abs(py - o.y) < (o.h / 2 + m)) return false;
+        } else if (o.t === 'bump') { if (Math.hypot(px - o.x, py - o.y) < o.r + m) return false; }
+        else if (o.t === 'spin') { if (Math.hypot(px - o.x, py - o.y) < o.len + m) return false; }
+        else if (o.t === 'crate') { if (Math.hypot(px - o.x, py - o.y) < Math.hypot(o.w, o.h) / 2 + m) return false; }
+        else if (o.t === 'well') { if (Math.hypot(px - o.x, py - o.y) < o.R * 0.85 + m) return true; }
+        else if (o.t === 'portal')
+        {
+          if (Math.hypot(px - o.ax, py - o.ay) < o.r + m || Math.hypot(px - o.bx, py - o.by) < o.r + m) return false;
+        }
+        else if (o.t === 'wind') { if (px > o.x - m && px < o.x + o.w + m && py > o.y - m && py < o.y + o.h + m) return true; }
+      }
+      return true;
+    }
+    function coinCorridor(def, n) {
+      const t = def.target, pts = [];
+      for (let i = 0; i < n * 4 && pts.length < n; i++)
+      {
+        const f = 0.25 + 0.6 * rand(0, 1);
+        const px = lerp(0.1, t.x, f) + (rand(0, 1) - 0.5) * 0.16;
+        const py = lerp(0.84, t.y, f) + (rand(0, 1) - 0.5) * 0.22;
+        if (px < 0.14 || px > 0.9 || py < 0.12 || py > 0.8) continue;
+        if (!clearOfObs(def, px, py, 0.055)) continue;
+        if (pts.some(p => Math.hypot(p.x - px, p.y - py) < 0.09)) continue;
+        pts.push({ x: +px.toFixed(3), y: +py.toFixed(3) });
+      }
+      return pts;
+    }
+
+    /* ---- solvability solver ---- */
+    function setObsTime(list, tg, t) {
+      for (const o of list)
+      {
+        if (o.t === 'move')
+        {
+          const s = Math.sin(t * o.sp + o.ph) * o.range;
+          if (o.ax === 'x') o.x = o.bx + s; else o.y = o.by + s;
+        }
+        else if (o.t === 'spin') o.ang = t * o.sp + o.ph;
+      }
+      if (tg.sp) tg.x = tg.bx + Math.sin(t * tg.sp) * tg.mx;
+    }
+    function simShot(dx, dy, spd, t0) {
+      const FR = 1 / 160, tg = target, hitR2 = Math.pow(tg.r * 0.92, 2);
+      const a = { x: bow.x + dx * 50 * K, y: bow.y + dy * 50 * K, vx: dx * spd, vy: dy * spd, bounces: 0, pcd: 0, simStop: false, welled: false };
+      for (let i = 0; i < 480; i++)
+      {
+        a.pcd = Math.max(0, a.pcd - FR);
+        setObsTime(obs, tg, t0 + (i + 1) * FR);
+        const sp = Math.hypot(a.vx, a.vy), n = clamp(Math.ceil(sp * FR / 6), 1, 4), h = FR / n;
+        for (let k = 0; k < n; k++)
+        {
+          a.vy += g * h; a.x += a.vx * h; a.y += a.vy * h;
+          if (resolveWorld(a, true, h)) return false;
+          const ex = a.x - tg.x, ey = a.y - tg.y;
+          if (ex * ex + ey * ey < hitR2) return true;
+        }
+      }
+      return false;
+    }
+    function directAngles(dxx, dyc, v) {
+      const left = dxx < 0; dxx = Math.abs(dxx);
+      if (dxx < 6) dxx = 6;
+      const v2 = v * v, A = g * dxx * dxx / (2 * v2);
+      const disc = dxx * dxx - 4 * A * (A - dyc);
+      if (disc <= 0) return [];
+      const s = Math.sqrt(disc);
+      const t1 = Math.atan((-dxx + s) / (2 * A)), t2 = Math.atan((-dxx - s) / (2 * A));
+      return left ? [ Math.PI - t1, Math.PI - t2 ] : [ t1, t2 ];
+    }
+    function checkSolvable(def) {
+      const savedObs = obs, savedTarget = target;
+      const L = buildLayout(def);
+      obs = L.obs; target = L.target;
+      const tg = target, base = Math.atan2(tg.y - bow.y, tg.x - bow.x);
+      const pseeds = [];
+      for (const o of L.obs) if (o.t === 'portal')
+      {
+        pseeds.push(Math.atan2(o.ay - bow.y, o.ax - bow.x));
+        pseeds.push(Math.atan2(o.by - bow.y, o.bx - bow.x));
+      }
+      const ring = n => { const r = []; for (let i = 0; i < n; i++)r.push(-Math.PI + (i + 0.5) * TAU / n); return r; };
+      const scan = (powers, offs, jits, ringN, fanN, fanStep) => {
+        let hits = 0;
+        for (const t0 of offs)
+        {
+          setObsTime(obs, target, t0);
+          for (const pf of powers)
+          {
+            const v = pf * vmax, angles = ring(ringN);
+            for (let k = -fanN; k <= fanN; k++)angles.push(base + k * fanStep);
+            for (const da of directAngles(tg.x - bow.x, tg.y - bow.y, v))
+              for (const j of jits) angles.push(da + j);
+            for (const ps of pseeds) for (const j of jits) angles.push(ps + j);
+            for (const a0 of angles)
+            {
+              if (simShot(Math.cos(a0), Math.sin(a0), v, t0)) { hits++; if (hits >= 3) return hits; }
+            }
+          }
+        }
+        return hits;
+      };
+      let paths = scan([ 0.55, 0.72, 0.88, 1.0 ], [ 0, 0.55, 1.1, 1.65 ], [ 0, 0.07, -0.07, 0.16, -0.16 ], 14, 4, 0.14);
+      if (paths === 0) paths = scan([ 0.5, 0.58, 0.66, 0.76, 0.86, 1.0 ], [ 0.28, 0.83, 1.38, 1.93, 2.48 ],
+        [ 0, 0.04, -0.04, 0.09, -0.09, 0.15, -0.15 ], 24, 7, 0.05);
+      obs = savedObs; target = savedTarget;
+      return { ok: paths > 0, paths };
+    }
+    function repairDef(def) {
+      let d = cloneDef(def); d.paths = 0;
+      const safe = safeTargetSpot();
+      for (let i = 0; i < 28; i++)
+      {
+        if (checkSolvable(d).ok) return d;
+        if (d.obs.length && i % 2) d.obs.splice((rand(0, d.obs.length)) | 0, 1);
+        d.target.x = lerp(d.target.x, safe.x, 0.3);
+        d.target.y = lerp(d.target.y, safe.y, 0.35);
+        if (d.target.mx) { d.target.mx *= 0.75; if (d.target.mx < 0.03) d.target.mx = 0; }
+      }
+      return { name: d.name, par: 1, arrows: 3, target: safe, coins: [], obs: [], paths: 1 };
+    }
+    function ensurePlayable(def) {
+      const v = checkSolvable(def);
+      if (v.ok) { def.paths = v.paths; return def; }
+      console.info('RICOCHET · layout failed verification — auto-adjusted for this screen geometry');
+      return repairDef(def);
+    }
+    function genCourse(d) {
+      let def = rollInfinite(d);
+      for (let attempt = 0; attempt < 24; attempt++)
+      {
+        const v = checkSolvable(def);
+        if (v.ok)
+        {
+          def.paths = v.paths;
+          def.coins = coinCorridor(def, 3 + (d % 3));
+          return def;
+        }
+        if (def.obs.length > 1 && attempt < 10) def.obs.splice((rand(0, def.obs.length)) | 0, 1);
+        else def = rollInfinite(d);
+      }
+      return { name: 'ENDLESS', par: 2, arrows: 4, target: safeTargetSpot(), coins: [], obs: [], paths: 1 };
+    }
+
+    /* ---- hint: the solver chalks you a line ---- */
+    function simPath(dx, dy, spd, t0) {
+      const FR = 1 / 160, tg = target, hitR2 = Math.pow(tg.r * 0.92, 2);
+      const a = { x: bow.x + dx * 50 * K, y: bow.y + dy * 50 * K, vx: dx * spd, vy: dy * spd, bounces: 0, pcd: 0, simStop: false, welled: false };
+      const pts = [ { x: a.x, y: a.y } ];
+      for (let i = 0; i < 480; i++)
+      {
+        a.pcd = Math.max(0, a.pcd - FR);
+        setObsTime(obs, tg, t0 + (i + 1) * FR);
+        const sp = Math.hypot(a.vx, a.vy), n = clamp(Math.ceil(sp * FR / 6), 1, 4), h = FR / n;
+        for (let k = 0; k < n; k++)
+        {
+          a.vy += g * h; a.x += a.vx * h; a.y += a.vy * h;
+          if (resolveWorld(a, true, h)) return null;
+          const ex = a.x - tg.x, ey = a.y - tg.y;
+          if (ex * ex + ey * ey < hitR2) { pts.push({ x: a.x, y: a.y }); return pts; }
+        }
+        if (i % 4 === 0 && pts.length < 200) pts.push({ x: a.x, y: a.y });
+      }
+      return null;
+    }
+    function findHint() {
+      const t0 = simTime, tg = target;
+      const base = Math.atan2(tg.y - bow.y, tg.x - bow.x);
+      const dirs = [];
+      for (const pf of [ 0.55, 0.72, 0.88, 1.0 ])
+      {
+        const v = pf * vmax;
+        for (const da of directAngles(tg.x - bow.x, tg.y - bow.y, v))
+          for (const j of [ 0, 0.05, -0.05, 0.12, -0.12 ]) dirs.push([ da + j, v ]);
+        for (let k = -5; k <= 5; k++)dirs.push([ base + k * 0.12, v ]);
+        for (let i = 0; i < 12; i++)dirs.push([ -Math.PI + (i + 0.5) * TAU / 12, v ]);
+      }
+      for (const o of obs) if (o.t === 'portal')
+      {
+        dirs.push([ Math.atan2(o.ay - bow.y, o.ax - bow.x), vmax ]);
+        dirs.push([ Math.atan2(o.by - bow.y, o.bx - bow.x), vmax ]);
+      }
+      for (const [ ang, v ] of dirs)
+      {
+        const p = simPath(Math.cos(ang), Math.sin(ang), v, t0);
+        if (p) return p;
+      }
+      return null;
+    }
+
+    /* ================= state ================= */
+    const $ = id => document.getElementById(id);
+    const menuEl = $('menu'), winEl = $('win'), loseEl = $('lose'), tagEl = $('tag'),
+      mapOv = $('mapOv'), statOv = $('statOv'), pauseOv = $('pauseOv'), toastEl = $('toast'),
+      slotsOv = $('slotsOv'), shareOv = $('shareOv'),
+      mapGrid = $('mapGrid'), mapFoot = $('mapFoot'), statList = $('statList'),
+      slotList = $('slotList'), shareTa = $('shareTa'), shareKick = $('shareKick'),
+      hScore = $('hScore'), hBest = $('hBest'), hCourse = $('hCourse'),
+      tagNo = $('tagNo'), tagNm = $('tagNm'),
+      menuBest = $('menuBest'), menuStars = $('menuStars'), menuAch = $('menuAch'), resetP = $('resetP'),
+      tourBtn = $('tourBtn'), infBtn = $('infBtn'), tourSub = $('tourSub'), tourGo = $('tourGo'),
+      infSub = $('infSub'), infGo = $('infGo'), tourPips = $('tourPips'), infMark = $('infMark'),
+      dailyBtn = $('dailyBtn'), statBtn = $('statBtn'), statClose = $('statClose'),
+      workBtn = $('workBtn'), mapBtn = $('mapBtn'), mapClose = $('mapClose'),
+      edChip = $('edChip'), edArN = $('edArN'), edToolsEl = $('edTools'), edPropsEl = $('edProps'),
+      pResume = $('pResume'), pRestart = $('pRestart'), pMap = $('pMap'), pQuit = $('pQuit'),
+      pHint = $('pHint'), pCalm = $('pCalm'),
+      wKick = $('wKick'), wTitle = $('wTitle'), wStars = $('wStars'), wShots = $('wShots'), wBank = $('wBank'),
+      wChain = $('wChain'), wSpared = $('wSpared'), wPts = $('wPts'), wTotal = $('wTotal'), wStamp = $('wStamp'),
+      wCta = $('wCta'),
+      lKick = $('lKick'), lTitle = $('lTitle'), lRule = $('lRule'), lScoreK = $('lScoreK'), lDepthK = $('lDepthK'),
+      lBestWrap = $('lBestWrap'), lBestD = $('lBestD'), lScore = $('lScore'), lCourse = $('lCourse'),
+      lStamp = $('lStamp'), lCta = $('lCta'), lCopy = $('lCopy'), lWork = $('lWork'),
+      muteBtn = $('mute'), pauseB = $('pauseB'), icOn = $('icOn'), icOff = $('icOff');
+
+    let mode = 'boot';
+    let gameMode = 'tour';        // tour | inf | daily | custom
+    let paused = false;
+    let courseNo = 1, courseDef = null, obs = [], target = null, coins = [], splats = [],
+      par = 1, arrowsLeft = 0, shotsUsed = 0, courseName = '', courseBestChain = 0;
+    let arrows = [], stuck = [], sparks = [], rings = [], floats = [], trailDots = [];
+    let ghostPath = [], ghostNo = -1, ghostTick = 0;
+    let hintPts = [], hintT = 0;
+    let score = 0, best = +(store.get('ric_best') || 0),
+      savedLevel = +(store.get('ric_level') || 1);
+    let tourStars;
+    try { tourStars = JSON.parse(store.get('ric_tour') || 'null'); } catch (e) { tourStars = null; }
+    if (Array.isArray(tourStars) && tourStars.length === 10)
+    {
+      while (tourStars.length < TOUR_LEN) tourStars.push(0);
+    } else if (!Array.isArray(tourStars) || tourStars.length !== TOUR_LEN)
+    {
+      tourStars = new Array(TOUR_LEN).fill(0);
+    }
+    let infBest = +(store.get('ric_infbest') || 0);
+    let calm = store.get('ric_calm') === '1';
+    let time = 0, simTime = 0, shake = 0, flash = 0, punch = 0;
+    let timeScale = 1, slowmoT = 0, zoom = 1, fx = 0, fy = 0;
+    let clearT = 0, clearData = null, winShown = false, winAt = 0, loseShown = false, loseAt = 0, failT = 0, newBest = false;
+    let menuAutoT = 1.2, pid = -1;
+    let charge = 0; const CHARGE_MAX = 4;
+    const bow = { x: 0, y: 0, ang: -0.7, pull: 0, vib: 0 };
+    const aim = { on: false, sx: 0, sy: 0, cx: 0, cy: 0, p: 0, dx: 0.7, dy: -0.7 };
+    function saveTour() { store.set('ric_tour', JSON.stringify(tourStars)); }
+    function tourStarSum() { return tourStars.reduce((a, b) => a + b, 0); }
+
+    /* ================= daily ================= */
+    const DML = [ 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC' ];
+    function dailySeed() { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+    function dailyLabel() { const d = new Date(); return DML[ d.getMonth() ] + ' ' + pad(d.getDate()); }
+
+    /* ============================================================
+       THE WORKSHOP — level editor
+       Works on the same normalized def schema as every puzzle,
+       reuses buildLayout/render for drawing, and pokes the shot
+       solver live so the chip always tells you if it's beatable.
+       ============================================================ */
+    const ED_TOOLS = [
+      [ 'sel', 'SELECT' ], [ 'tgt', 'TARGET' ], [ 'coin', 'COIN' ], [ 'plank', 'PLANK' ], [ 'crate', 'CRATE' ],
+      [ 'bump', 'BUMPER' ], [ 'spin', 'SPINNER' ], [ 'move', 'MOVER' ], [ 'wind', 'WIND' ],
+      [ 'well', 'WELL' ], [ 'port', 'PORTAL' ], [ 'erase', 'ERASE' ]
+    ];
+    const ED_ICONS = {
+      sel: '<svg class="ico" viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-2 6z"/></svg>',
+      tgt: '<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle class="f" cx="12" cy="12" r="1.6"/></svg>',
+      coin: '<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3.5"/></svg>',
+      plank: '<svg class="ico" viewBox="0 0 24 24"><rect x="3" y="10" width="18" height="4" rx="1"/></svg>',
+      crate: '<svg class="ico" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14"/><path d="M5 5l14 14M19 5L5 19"/></svg>',
+      bump: '<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+      spin: '<svg class="ico" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="2.5"/></svg>',
+      move: '<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="10" width="12" height="4" rx="1"/><path d="M19 6v12" stroke-dasharray="2 3"/></svg>',
+      wind: '<svg class="ico" viewBox="0 0 24 24"><path d="M3 8h10a3 3 0 1 0-3-3M3 12h14a3 3 0 1 1-3 3M3 16h7"/></svg>',
+      well: '<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3 4"/><path d="M12 12m-4 0a4 4 0 1 0 8 0"/></svg>',
+      port: '<svg class="ico" viewBox="0 0 24 24"><circle cx="7" cy="12" r="4"/><circle cx="17" cy="12" r="4"/><path d="M11 12h2" stroke-dasharray="1 2"/></svg>',
+      erase: '<svg class="ico" viewBox="0 0 24 24"><path d="M4 20h16M7 16L17 6l4 4-10 10H7z"/></svg>'
+    };
+    let ed = { def: null, tool: 'sel', sel: null, drag: null, pending: null, verify: '', vt: null, undo: [] };
+    let slots;
+    try { slots = JSON.parse(store.get('ric_slots') || '[]'); } catch (e) { slots = null; }
+    if (!Array.isArray(slots)) slots = [];
+    function saveSlots() { store.set('ric_slots', JSON.stringify(slots.slice(0, 8))); }
+    function starterDef() {
+      return {
+        name: 'MY PUZZLE', par: 2, arrows: 3, target: { x: .72, y: .28 },
+        coins: [ { x: .38, y: .6 }, { x: .5, y: .45 } ],
+        obs: [ { t: 'plank', x: .46, y: .55, w: .03, h: .4, a: 0 } ]
+      };
+    }
+    function edSync() {
+      courseDef = ed.def;
+      layoutCourse();
+      scheduleVerify();
+      edArN.textContent = ed.def.arrows + ' ARROWS';
+    }
+    function scheduleVerify() {
+      clearTimeout(ed.vt);
+      ed.vt = setTimeout(runVerify, 260);
+    }
+    function runVerify() {
+      if (!ed.def) return;
+      const v = checkSolvable(ed.def);
+      ed.verify = v.ok ? ('✓ SOLVER: ' + (v.paths >= 3 ? '3+' : v.paths) + ' PATH' + (v.paths === 1 ? '' : 'S'))
+        : '✗ UNSOLVABLE — REACH THE TARGET';
+      edChip.textContent = ed.verify;
+      edChip.className = 'edchip ' + (v.ok ? 'ok' : 'bad');
+    }
+    function pushUndo() {
+      ed.undo.push(JSON.stringify({ t: ed.def.target, c: ed.def.coins, o: ed.def.obs, a: ed.def.arrows }));
+      if (ed.undo.length > 50) ed.undo.shift();
+    }
+    function undoEd() {
+      const s = ed.undo.pop(); if (!s) return;
+      const d = JSON.parse(s);
+      ed.def.target = d.t; ed.def.coins = d.c; ed.def.obs = d.o; ed.def.arrows = d.a;
+      ed.sel = null; ed.pending = null;
+      edSync(); edProps(); sfx.tick2();
+    }
+    function edFloat(txt) { floats.push(mkFloat(W / 2, H * 0.32, txt, ACC, 12)); }
+    function getSel() {
+      const s = ed.sel; if (!s) return null;
+      if (s.k === 'target') return ed.def.target;
+      if (s.k === 'coin') return ed.def.coins[ s.i ];
+      return ed.def.obs[ s.i ];
+    }
+    function selRing(s) {
+      const d = ed.def;
+      if (!s) return null;
+      if (s.k === 'target') return { x: d.target.x * W, y: d.target.y * H, r: clamp(.115 * U, 36, 62) + 10 };
+      if (s.k === 'coin') { const c = d.coins[ s.i ]; if (!c) return null; return { x: c.x * W, y: c.y * H, r: 20 }; }
+      const o = d.obs[ s.i ]; if (!o) return null;
+      if (o.t === 'plank' || o.t === 'crate') return { x: o.x * W, y: o.y * H, r: Math.max(o.w * U, o.h * U) / 2 + 12, rect: true, w: o.w * W, h: o.h * H };
+      if (o.t === 'bump') return { x: o.x * W, y: o.y * H, r: o.r * U + 10 };
+      if (o.t === 'spin') return { x: o.x * W, y: o.y * H, r: o.len * U + 10 };
+      if (o.t === 'move') return { x: o.x * W, y: o.y * H, r: o.w * U / 2 + 12, rect: true, w: o.w * W, h: o.h * H };
+      if (o.t === 'well') return { x: o.x * W, y: o.y * H, r: o.R * U + 6 };
+      if (o.t === 'wind') return { x: o.x * W, y: o.y * H, r: 0, rect: true, w: o.w * W, h: o.h * H };
+      if (o.t === 'portal') return { x: o.ax * W, y: o.ay * H, r: o.r * U + 8, portal: o };
+      return null;
+    }
+    function edHit(px, py) {
+      const d = ed.def; let best = null, bd = 1e9;
+      const consider = (k, i, cx, cy, r) => {
+        const dist = Math.hypot(px - cx, py - cy);
+        if (dist < r && dist < bd) { bd = dist; best = { k, i }; }
+      };
+      consider('target', 0, d.target.x * W, d.target.y * H, clamp(.115 * U, 36, 62) + 10);
+      d.coins.forEach((c, i) => consider('coin', i, c.x * W, c.y * H, 22));
+      for (let i = d.obs.length - 1; i >= 0; i--)
+      {
+        const o = d.obs[ i ];
+        if (o.t === 'plank' || o.t === 'crate') consider('obs', i, o.x * W, o.y * H, Math.max(o.w * U, o.h * U) / 2 + 12);
+        else if (o.t === 'bump') consider('obs', i, o.x * W, o.y * H, o.r * U + 10);
+        else if (o.t === 'spin') consider('obs', i, o.x * W, o.y * H, o.len * U + 10);
+        else if (o.t === 'move') consider('obs', i, o.x * W, o.y * H, o.w * U / 2 + 12);
+        else if (o.t === 'well') consider('obs', i, o.x * W, o.y * H, o.R * U + 8);
+        else if (o.t === 'portal')
+        {
+          consider('obs', i, o.ax * W, o.ay * H, o.r * U + 10);
+          consider('obs', i, o.bx * W, o.by * H, o.r * U + 10);
+        }
+      }
+      if (!best)
+      { // wind rects are low-priority (large area)
+        for (let i = d.obs.length - 1; i >= 0; i--)
+        {
+          const o = d.obs[ i ];
+          if (o.t !== 'wind') continue;
+          if (px > o.x * W - 8 && px < o.x * W + o.w * W + 8 && py > o.y * H - 8 && py < o.y * H + o.h * H + 8) { best = { k: 'obs', i }; break; }
+        }
+      }
+      return best;
+    }
+    function mkOb(tool, nx, ny) {
+      switch (tool)
+      {
+        case 'plank': return { t: 'plank', x: nx, y: ny, w: .2, h: .032, a: 0 };
+        case 'crate': return { t: 'crate', x: nx, y: ny, w: .055, h: .055, a: 0 };
+        case 'bump': return { t: 'bump', x: nx, y: ny, r: .06 };
+        case 'spin': return { t: 'spin', x: nx, y: ny, len: .22, sp: 1.6, ph: 0 };
+        case 'move': return { t: 'move', x: nx, y: ny, w: .28, h: .032, ax: 'x', range: .12, sp: 1.2, ph: 0 };
+        case 'wind': return { t: 'wind', x: nx - .08, y: ny - .11, w: .16, h: .22, kx: 0, ky: -.9 };
+        case 'well': return { t: 'well', x: nx, y: ny, f: 2.6, R: .26 };
+      }
+      return null;
+    }
+    function countObs() { return ed.def.obs.length; }
+    function edPlace(nx, ny) {
+      const px = nx * W, py = ny * H;
+      if (Math.hypot(px - bow.x, py - bow.y) < 100) { edFloat('TOO CLOSE TO THE BOW'); return; }
+      const d = ed.def;
+      if (ed.tool === 'tgt')
+      {
+        pushUndo(); d.target.x = nx; d.target.y = ny;
+        ed.sel = { k: 'target' }; sfx.place();
+      } else if (ed.tool === 'coin')
+      {
+        if (d.coins.length >= 8) { edFloat('COIN LIMIT (8)'); return; }
+        pushUndo(); d.coins.push({ x: nx, y: ny });
+        ed.sel = { k: 'coin', i: d.coins.length - 1 }; sfx.place();
+      } else if (ed.tool === 'port')
+      {
+        if (!ed.pending) { ed.pending = { x: nx, y: ny }; edFloat('NOW TAP THE SECOND END'); return; }
+        if (countObs() >= 24) { edFloat('OBSTACLE LIMIT (24)'); ed.pending = null; return; }
+        pushUndo();
+        d.obs.push({ t: 'portal', ax: ed.pending.x, ay: ed.pending.y, bx: nx, by: ny, r: .07 });
+        ed.pending = null; ed.sel = { k: 'obs', i: d.obs.length - 1 }; sfx.portal();
+      } else
+      {
+        if (countObs() >= 24) { edFloat('OBSTACLE LIMIT (24)'); return; }
+        pushUndo();
+        d.obs.push(mkOb(ed.tool, nx, ny));
+        ed.sel = { k: 'obs', i: d.obs.length - 1 }; sfx.place();
+      }
+      edSync();
+    }
+    function eraseAt(nx, ny) {
+      const h = edHit(nx * W, ny * H);
+      if (!h || h.k === 'target') { edFloat('NOTHING TO ERASE'); return; }
+      pushUndo();
+      if (h.k === 'coin') ed.def.coins.splice(h.i, 1);
+      else ed.def.obs.splice(h.i, 1);
+      ed.sel = null; edSync(); sfx.thunk();
+    }
+    function startDrag(e, sel) {
+      const it = getSel(); if (!it) return;
+      let ix, iy, end = null;
+      if (sel.k === 'obs' && it.t === 'portal')
+      {
+        const dA = Math.hypot(e.clientX - it.ax * W, e.clientY - it.ay * H);
+        end = dA <= (it.bx * W - e.clientX) ? 'a' : 'b';
+        ix = (end === 'a' ? it.ax : it.bx); iy = (end === 'a' ? it.ay : it.by);
+      } else { ix = it.x; iy = it.y; }
+      ed.drag = { sel, end, ox: ix - e.clientX / W, oy: iy - e.clientY / H };
+      pushUndo();
+    }
+    function edDragMove(e) {
+      const dg = ed.drag; if (!dg) return;
+      const it = getSel(); if (!it) return;
+      const nx = clamp(e.clientX / W + dg.ox, .05, .95), ny = clamp(e.clientY / H + dg.oy, .1, .88);
+      if (dg.sel.k === 'target') { it.x = nx; it.y = ny; }
+      else if (dg.sel.k === 'coin') { it.x = nx; it.y = ny; }
+      else if (it.t === 'portal')
+      {
+        if (dg.end === 'a') { it.ax = nx; it.ay = ny; } else { it.bx = nx; it.by = ny; }
+      } else { it.x = nx; it.y = ny; }
+      edSync();
+    }
+    function edAct(act, it) {
+      const s = ed.sel;
+      const del = () => {
+        if (s.k === 'coin') ed.def.coins.splice(s.i, 1);
+        else ed.def.obs.splice(s.i, 1);
+        ed.sel = null;
+      };
+      if (act === 'del') { del(); return; }
+      if (!it) return;
+      switch (act)
+      {
+        case 'rl': if ('a' in it) it.a -= Math.PI / 12; break;
+        case 'rr': if ('a' in it) it.a += Math.PI / 12; break;
+        case 'big':
+          if (it.t === 'plank') it.w = clamp(it.w + 0.03, .08, .46);
+          else if (it.t === 'crate') it.w = it.h = clamp(it.w + 0.01, .03, .09);
+          else if (it.t === 'bump') it.r = clamp(it.r + 0.008, .03, .09);
+          else if (it.t === 'spin') it.len = clamp(it.len + 0.02, .1, .32);
+          else if (it.t === 'move') it.w = clamp(it.w + 0.03, .14, .4);
+          else if (it.t === 'well') it.R = clamp(it.R + 0.02, .14, .4);
+          else if (it.t === 'portal') it.r = clamp(it.r + 0.008, .05, .1);
+          break;
+        case 'sml':
+          if (it.t === 'plank') it.w = clamp(it.w - 0.03, .08, .46);
+          else if (it.t === 'crate') it.w = it.h = clamp(it.w - 0.01, .03, .09);
+          else if (it.t === 'bump') it.r = clamp(it.r - 0.008, .03, .09);
+          else if (it.t === 'spin') it.len = clamp(it.len - 0.02, .1, .32);
+          else if (it.t === 'move') it.w = clamp(it.w - 0.03, .14, .4);
+          else if (it.t === 'well') it.R = clamp(it.R - 0.02, .14, .4);
+          else if (it.t === 'portal') it.r = clamp(it.r - 0.008, .05, .1);
+          break;
+        case 'fst':
+          if (it.t === 'spin') it.sp = clamp(it.sp + (it.sp < 0 ? 0.2 : -0.2), -3.4, 3.4);
+          else if (it.t === 'move') it.sp = clamp(it.sp + 0.15, .5, 2.2);
+          else if (it.t === 'well') it.f = clamp(it.f + 0.3, 1.2, 4);
+          else if (it.t === 'wind')
+          {
+            const m = Math.hypot(it.kx, it.ky) || 0.9;
+            it.kx = it.kx / m * clamp(m + 0.15, .3, 1.4); it.ky = it.ky / m * clamp(m + 0.15, .3, 1.4);
+          }
+          break;
+        case 'slw':
+          if (it.t === 'spin') it.sp = clamp(it.sp - (it.sp < 0 ? -0.2 : 0.2), -3.4, 3.4);
+          else if (it.t === 'move') it.sp = clamp(it.sp - 0.15, .5, 2.2);
+          else if (it.t === 'well') it.f = clamp(it.f - 0.3, 1.2, 4);
+          else if (it.t === 'wind')
+          {
+            const m = Math.hypot(it.kx, it.ky) || 0.9;
+            it.kx = it.kx / m * clamp(m - 0.15, .3, 1.4); it.ky = it.ky / m * clamp(m - 0.15, .3, 1.4);
+          }
+          break;
+        case 'rev': if ('sp' in it) it.sp *= -1; break;
+        case 'ax': if (it.t === 'move') it.ax = it.ax === 'x' ? 'y' : 'x'; break;
+        case 'dir': {
+          const a = Math.atan2(it.ky, it.kx) + Math.PI / 4;
+          it.kx = +(Math.cos(a) * 0.9).toFixed(2); it.ky = +(Math.sin(a) * 0.9).toFixed(2);
+          break;
+        }
+        case 'rng': it.range = clamp(it.range + 0.02, .04, .22); break;
+        case 'rng-': it.range = clamp(it.range - 0.02, .04, .22); break;
+      }
+    }
+    function edProps() {
+      const P = edPropsEl; P.innerHTML = '';
+      const s = ed.sel, it = getSel();
+      if (!it || ed.pending) { P.innerHTML = '<span class="edmsg">' + (ed.pending ? 'PLACING PORTAL — TAP THE SECOND END' : 'SELECT OR PLACE SOMETHING') + '</span>'; return; }
+      const B = (lbl, act, warn) => {
+        const b = document.createElement('button');
+        b.className = 'pbtn' + (warn ? ' warn' : ''); b.textContent = lbl;
+        b.addEventListener('pointerdown', e => e.stopPropagation());
+        b.addEventListener('click', e => {
+          e.stopPropagation(); pushUndo(); edAct(act, it); edSync(); edProps();
+        });
+        P.appendChild(b);
+      };
+      if (s.k === 'target') { const m = document.createElement('span'); m.className = 'edmsg'; m.textContent = 'TARGET — DRAG TO MOVE'; P.appendChild(m); return; }
+      if (s.k === 'coin') { B('✕ REMOVE', 'del', true); return; }
+      switch (it.t)
+      {
+        case 'plank': B('⟲', 'rl'); B('⟳', 'rr'); B('LEN +', 'big'); B('LEN −', 'sml'); B('✕', 'del', true); break;
+        case 'crate': B('⟲', 'rl'); B('⟳', 'rr'); B('SIZE +', 'big'); B('SIZE −', 'sml'); B('✕', 'del', true); break;
+        case 'bump': B('R +', 'big'); B('R −', 'sml'); B('✕', 'del', true); break;
+        case 'spin': B('LEN +', 'big'); B('LEN −', 'sml'); B('SPD +', 'fst'); B('SPD −', 'slw'); B('REVERSE', 'rev'); B('✕', 'del', true); break;
+        case 'move': B('AXIS: ' + (it.ax || 'x').toUpperCase(), 'ax'); B('RANGE +', 'rng'); B('RANGE −', 'rng-'); B('SPD +', 'fst'); B('SPD −', 'slw'); B('✕', 'del', true); break;
+        case 'wind': B('ROTATE DIR', 'dir'); B('FORCE +', 'fst'); B('FORCE −', 'slw'); B('✕', 'del', true); break;
+        case 'well': B('R +', 'big'); B('R −', 'sml'); B('PULL +', 'fst'); B('PULL −', 'slw'); B('✕', 'del', true); break;
+        case 'portal': B('R +', 'big'); B('R −', 'sml'); B('✕ PAIR', 'del', true); break;
+      }
+    }
+    function buildTools() {
+      edToolsEl.innerHTML = '';
+      for (const [ id, lbl ] of ED_TOOLS)
+      {
+        const b = document.createElement('button');
+        b.className = 'tbtn' + (ed.tool === id ? ' on' : '');
+        b.innerHTML = '<svg class="ico' + (id === 'tgt' || id === 'coin' ? ' f' : '') + '" viewBox="0 0 24 24">' + ED_ICONS[ id ] + '</svg>' + lbl;
+        b.addEventListener('pointerdown', e => e.stopPropagation());
+        b.addEventListener('click', e => {
+          e.stopPropagation();
+          ed.tool = id; ed.pending = (id === 'port') ? ed.pending : null;
+          if (id !== 'port') ed.pending = null;
+          buildTools(); edProps(); sfx.tick2();
+        });
+        edToolsEl.appendChild(b);
+      }
+    }
+    /* editor pointer handlers */
+    function edDown(e) {
+      if (mode !== 'editor') return;
+      audio();
+      const nx = clamp(e.clientX / W, .04, .96), ny = clamp(e.clientY / H, .09, .9);
+      if (ed.tool === 'erase') { eraseAt(nx, ny); edProps(); return; }
+      const h = edHit(e.clientX, e.clientY);
+      if (h && !(ed.tool === 'tgt' || ed.tool === 'coin' || ed.tool === 'port'))
+      {
+        ed.sel = h; startDrag(e, h); edProps(); return;
+      }
+      edPlace(nx, ny); edProps();
+    }
+    function encodeDef(d) {
+      return 'R1' + btoa(unescape(encodeURIComponent(JSON.stringify(d))));
+    }
+    function decodeDef(s) {
+      s = (s || '').trim();
+      if (!s.startsWith('R1')) throw new Error('bad header');
+      const d = JSON.parse(decodeURIComponent(escape(atob(s.slice(2)))));
+      if (!d || !d.target || typeof d.target.x !== 'number' || !Array.isArray(d.obs)) throw new Error('bad def');
+      d.coins = Array.isArray(d.coins) ? d.coins.slice(0, 8) : [];
+      d.arrows = clamp(d.arrows | 0 || 3, 1, 9);
+      d.par = clamp(d.par | 0 || 2, 1, 5);
+      d.name = String(d.name || 'IMPORT').slice(0, 16);
+      const ok = [ 'plank', 'crate', 'bump', 'spin', 'move', 'wind', 'well', 'portal' ];
+      d.obs = d.obs.filter(o => o && ok.includes(o.t)).slice(0, 24);
+      d.target.x = clamp(+d.target.x, .05, .95); d.target.y = clamp(+d.target.y, .1, .88);
+      return d;
+    }
+    function openEditor() {
+      hideAllOv();
+      paused = false;
+      mode = 'editor';
+      if (!ed.def) ed.def = starterDef();
+      splats = []; ghostPath = []; hintPts = []; hintT = 0;
+      arrows = []; stuck = []; trailDots = []; charge = 0;
+      resetFx();
+      document.body.classList.add('editing');
+      buildTools(); edProps(); edSync();
+      hCourse.textContent = 'WORKSHOP';
+      sfx.ui();
+    }
+    function exitToEditor() { openEditor(); }
+    function startCustom() {
+      gameMode = 'custom';
+      hideAllOv();
+      document.body.classList.remove('editing');
+      score = 0; charge = 0; newBest = false;
+      resetFx();
+      splats = []; ghostPath = [];
+      setCourse(1);
+      mode = 'play';
+      sfx.ui();
+    }
+    function renderSlots() {
+      slotList.innerHTML = '';
+      for (let i = 0; i < 8; i++)
+      {
+        const s = slots[ i ];
+        const row = document.createElement('div'); row.className = 'srow';
+        const info = s ? (s.name + ' · ' + s.def.obs.length + ' obj · ' + s.def.arrows + ' arrows') : '— empty —';
+        row.innerHTML = '<b>' + pad(i + 1) + '</b><span>' + info + '</span>';
+        if (s)
+        {
+          const bl = document.createElement('button'); bl.textContent = 'LOAD';
+          bl.addEventListener('click', ev => {
+            ev.stopPropagation();
+            pushUndo();
+            ed.def = cloneDef(s.def); ed.sel = null; ed.pending = null;
+            edSync(); edProps(); renderSlots(); slotsOv.classList.add('hidden');
+            sfx.ui();
+          });
+          const bs = document.createElement('button'); bs.textContent = 'SHARE';
+          bs.addEventListener('click', ev => { ev.stopPropagation(); openShare(encodeDef(s.def)); });
+          const bx = document.createElement('button'); bx.textContent = '✕'; bx.className = 'x';
+          bx.addEventListener('click', ev => {
+            ev.stopPropagation();
+            slots.splice(i, 1); saveSlots(); renderSlots(); sfx.thunk();
+          });
+          row.append(bl, bs, bx);
+        }
+        slotList.appendChild(row);
+      }
+    }
+    let shareMode = 'export';
+    function openShare(code, importing) {
+      shareMode = importing ? 'import' : 'export';
+      shareKick.textContent = importing ? 'IMPORT — PASTE A CODE' : 'SHARE CODE';
+      shareTa.value = code || '';
+      shareTa.readOnly = !importing;
+      shareImport.style.display = importing ? '' : 'none';
+      shareOv.classList.remove('hidden');
+    }
+
+    /* ================= course setup ================= */
+    function layoutCourse() {
+      const L = buildLayout(courseDef);
+      obs = L.obs; target = L.target;
+      coins = (courseDef.coins || []).map(c => ({ x: c.x * W, y: c.y * H, r: clamp(0.02 * U, 10, 15), ph: rand(0, TAU), got: false }));
+    }
+    function setCourse(no) {
+      courseNo = no;
+      paused = false; pauseOv.classList.add('hidden');
+      hintPts = []; hintT = 0;
+      let raw;
+      if (gameMode === 'tour') raw = COURSES[ no - 1 ];
+      else if (gameMode === 'daily') raw = withRNG(seededRand(dailySeed()), () => genCourse(7));
+      else if (gameMode === 'custom') raw = cloneDef(ed.def);
+      else raw = genCourse(no);
+      courseDef = gameMode === 'custom' ? raw : ensurePlayable(raw);
+      layoutCourse();
+      arrowsLeft = courseDef.arrows; par = courseDef.par;
+      courseName = gameMode === 'tour' ? courseDef.name : 'ENDLESS';
+      shotsUsed = 0; courseBestChain = 0; arrows = []; stuck = []; trailDots = []; splats = [];
+      aim.on = false; pid = -1;
+      if (courseNo !== ghostNo) { ghostPath = []; ghostNo = courseNo; }
+      ghostTick = 0;
+      showTag(no, courseName, par, arrowsLeft);
+    }
+    function showTag(no, name, p, ar) {
+      tagNo.textContent = 'Nº' + pad(no);
+      const feats = [];
+      let hasP = false, hasW = false, hasC = false, hasG = false;
+      for (const o of courseDef.obs)
+      {
+        if (o.t === 'portal') hasP = true; else if (o.t === 'wind') hasW = true;
+        else if (o.t === 'crate') hasC = true; else if (o.t === 'well') hasG = true;
+      }
+      if (hasP) feats.push('PORTALS');
+      if (hasW) feats.push('WIND');
+      if (hasG) feats.push('WELLS');
+      if (hasC) feats.push('CRATES');
+      if (courseDef.coins && courseDef.coins.length) feats.push('COINS ×' + courseDef.coins.length);
+      let head;
+      if (gameMode === 'tour') head = name.toUpperCase();
+      else if (gameMode === 'daily') head = 'PUZZLE OF THE DAY — ' + dailyLabel();
+      else if (gameMode === 'custom') head = 'WORKSHOP PLAYTEST';
+      else head = 'INFINITE — DEPTH ' + pad(no);
+      tagNm.textContent = head + ' — PAR ' + p + ' · ' + ar + ' ARROWS' + (feats.length ? ' · ' + feats.join(' · ') : '');
+      tagEl.classList.remove('show'); void tagEl.offsetWidth; tagEl.classList.add('show');
+    }
+    function resetFx() {
+      slowmoT = 0; timeScale = 1; zoom = 1; punch = 0; shake = 0; flash = 0;
+      sparks = []; rings = []; floats = [];
+    }
+    function hideAllOv() {
+      menuEl.classList.add('hidden'); winEl.classList.add('hidden');
+      loseEl.classList.add('hidden'); mapOv.classList.add('hidden');
+      pauseOv.classList.add('hidden'); slotsOv.classList.add('hidden');
+      shareOv.classList.add('hidden');
+    }
+    function startTour(fromNo) {
+      gameMode = 'tour'; hideAllOv();
+      document.body.classList.remove('editing');
+      score = 0; charge = 0; newBest = false;
+      resetFx();
+      setCourse(clamp(fromNo || savedLevel, 1, TOUR_LEN));
+      mode = 'play'; sfx.ui();
+    }
+    function startInfinite(keepScore) {
+      gameMode = 'inf'; hideAllOv();
+      document.body.classList.remove('editing');
+      if (!keepScore) { score = 0; charge = 0; }
+      newBest = false;
+      resetFx();
+      setCourse(1);
+      mode = 'play'; sfx.ui();
+    }
+    function startDaily() {
+      gameMode = 'daily'; hideAllOv();
+      document.body.classList.remove('editing');
+      score = 0; charge = 0; newBest = false;
+      resetFx();
+      setCourse(1);
+      mode = 'play'; sfx.ui();
+    }
+    function menuInit() {
+      courseDef = COURSES[ 4 ]; courseNo = 5; courseName = 'WINDMILL';
+      layoutCourse(); arrows = []; stuck = []; trailDots = []; arrowsLeft = 0;
+      ghostPath = []; ghostNo = -1; hintPts = []; hintT = 0;
+    }
+    function goMenu() {
+      hideAllOv(); statOv.classList.add('hidden');
+      document.body.classList.remove('editing');
+      paused = false; mode = 'menu';
+      resetFx();
+      menuInit(); updateMenuText();
+      menuEl.classList.remove('hidden');
+    }
+    function updateMenuText() {
+      menuBest.textContent = best;
+      menuStars.textContent = tourStarSum();
+      menuAch.textContent = ach.size + '/' + ACH.length;
+      const cleared = tourStars.filter(s => s > 0).length;
+      tourSub.textContent = cleared === 0 ? '20 HANDCRAFTED PUZZLES'
+        : cleared < TOUR_LEN ? tourStarSum() + '/' + (3 * TOUR_LEN) + ' STARS COLLECTED' : 'ALL ' + (3 * TOUR_LEN) + ' STARS — FLAWLESS';
+      tourGo.textContent = cleared >= TOUR_LEN ? 'REPLAY TOUR' : 'BEGIN — Nº' + pad(clamp(savedLevel, 1, TOUR_LEN));
+      tourPips.innerHTML = '';
+      for (let i = 0; i < TOUR_LEN; i++)
+      {
+        const p = document.createElement('i');
+        p.className = 'pip' + (tourStars[ i ] > 0 ? ' on' : '') + (tourStars[ i ] >= 3 ? ' gold' : '');
+        tourPips.appendChild(p);
+      }
+      infSub.textContent = infBest > 0 ? 'BEST DEPTH — ' + pad(infBest) : 'ENDLESS · SOLVER-VERIFIED';
+      infGo.textContent = 'DESCEND — DEPTH 01';
+      infMark.innerHTML = '';
+      for (const th of [ 5, 10, 20 ])
+      {
+        const p = document.createElement('i');
+        p.className = 'pip' + (infBest >= th ? ' on' : '');
+        infMark.appendChild(p);
+      }
+      dailyBtn.textContent = 'PUZZLE OF THE DAY — ' + dailyLabel();
+    }
+
+    /* ================= collisions & fields ================= */
+    function circleOBB(cx, cy, cr, bx, by, hw, hh, ang) {
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      const dx = cx - bx, dy = cy - by;
+      const lx = dx * ca + dy * sa, ly = -dx * sa + dy * ca;
+      const qx = clamp(lx, -hw, hw), qy = clamp(ly, -hh, hh);
+      const ddx = lx - qx, ddy = ly - qy, d2 = ddx * ddx + ddy * ddy;
+      if (d2 > cr * cr) return null;
+      let nx, ny, pen;
+      if (d2 > 1e-9) { const d = Math.sqrt(d2); nx = ddx / d; ny = ddy / d; pen = cr - d; }
+      else
+      {
+        const px = hw - Math.abs(lx), py = hh - Math.abs(ly);
+        if (px < py) { nx = lx < 0 ? -1 : 1; ny = 0; pen = cr + px; } else { nx = 0; ny = ly < 0 ? -1 : 1; pen = cr + py; }
+      }
+      return {
+        nx: nx * ca - ny * sa, ny: nx * sa + ny * ca, pen,
+        wcx: bx + qx * ca - qy * sa, wcy: by + qx * sa + qy * ca
+      };
+    }
+    function circleSeg(px, py, cr, ax, ay, bx, by, rad) {
+      const abx = bx - ax, aby = by - ay, L2 = abx * abx + aby * aby || 1e-9;
+      let t = ((px - ax) * abx + (py - ay) * aby) / L2; t = clamp(t, 0, 1);
+      const qx = ax + abx * t, qy = ay + aby * t;
+      const dx = px - qx, dy = py - qy, d2 = dx * dx + dy * dy, R = cr + rad;
+      if (d2 >= R * R) return null;
+      const d = Math.sqrt(d2);
+      let nx = 0, ny = -1, pen = R;
+      if (d > 1e-6) { nx = dx / d; ny = dy / d; pen = R - d; }
+      return { nx, ny, pen, qx, qy };
+    }
+    function addSplat(x, y, acc) {
+      const pts = []; const n = 3 + ((rand(0, 3)) | 0);
+      for (let i = 0; i < n; i++)pts.push({ dx: rand(-9, 9), dy: rand(-9, 9), r: rand(2.5, 6.5) });
+      splats.push({ x, y, pts, acc });
+      if (splats.length > 70) splats.shift();
+    }
+    function stickArrow(a, x, y, nx, ny) {
+      stuck.push({ x: x - nx * 2, y: y - ny * 2, a: Math.atan2(-ny, -nx), t: 0 });
+      if (stuck.length > 16) stuck.shift();
+      addSplat(x, y, false);
+      a.gone = true; sfx.thunk(); sparksBurst(x, y, 3, INK, 60);
+    }
+    function fxSlice(x, y) {
+      addSplat(x, y, true);
+      sparksBurst(x, y, 4, ACC, 120);
+      score += 15; stats.pierces++; saveStats();
+      floats.push(mkFloat(x, y - 14, '+15', ACC, 10));
+      sfx.slice();
+    }
+    function fxCrate(c) {
+      sparksBurst(c.wcx, c.wcy, 10, INK, 220);
+      sparksBurst(c.wcx, c.wcy, 6, ACC, 150);
+      rings.push({ x: c.wcx, y: c.wcy, r0: 4, r1: 36, age: 0, life: 0.4, col: INK, lw: 2.5 });
+      score += 40; stats.crates++; saveStats();
+      floats.push(mkFloat(c.wcx, c.wcy - 16, '+40 SMASH', INK, 12));
+      shake = Math.max(shake, 3.5);
+      sfx.crate(); award('demo');
+    }
+    function fxPortal(o) {
+      for (const [ px, py ] of [ [ o.ax, o.ay ], [ o.bx, o.by ] ])
+        for (let i = 0; i < 8; i++)
+        {
+          const a = rand(0, TAU), s = rand(60, 220);
+          sparks.push({
+            x: px, y: py, vx: Math.cos(a) * s, vy: Math.sin(a) * s, g: 0, age: 0, life: rand(0.25, 0.5),
+            kind: 2, rot: 0, vr: 0, col: ACC, s: rand(1.8, 3.4) * Math.max(K, 0.8)
+          });
+        }
+      rings.push({ x: o.ax, y: o.ay, r0: 4, r1: 34, age: 0, life: 0.35, col: ACC, lw: 2 });
+      rings.push({ x: o.bx, y: o.by, r0: 4, r1: 34, age: 0, life: 0.35, col: ACC, lw: 2 });
+    }
+    function fxBounce(a, ev) {
+      const s = clamp(ev.imp / (vmax * 0.45), 0.15, 1);
+      sparksBurst(ev.x, ev.y, 3 + Math.round(4 * s), ev.t === 'bump' ? ACC : INK, 90 + 260 * s);
+      rings.push({ x: ev.x, y: ev.y, r0: 3, r1: 10 + 30 * s, age: 0, life: 0.32, col: ev.t === 'bump' ? ACC : INK, lw: 2 });
+      shake = Math.max(shake, Math.min(4, ev.imp / 750));
+      stats.banks++; saveStats();
+      if (ev.t === 'bump') { score += 25; floats.push(mkFloat(ev.x, ev.y - 16, '+25', ACC, 12)); sfx.ding(); }
+      else if (ev.t === 'plank') { score += 10; floats.push(mkFloat(ev.x, ev.y - 14, '+10', INK, 10)); sfx.wood(s); }
+      else if (ev.t === 'spin') { score += 10; sfx.clank(); }
+      else sfx.wall(s);
+      if (a.bounces === 3) floats.push(mkFloat(a.x, a.y - 30, 'RICOCHET ×3', ACC, 12));
+    }
+    /* Wind, wells, portals and crates live here, so live flight, the aim
+       preview, the hint chalk AND the solver share identical physics. */
+    function resolveWorld(a, ghost, h) {
+      const IN = 16; let ev = null;
+      let inAny = false;
+      for (const o of obs)
+      {
+        if (o.t !== 'wind') continue;
+        if (a.x > o.x && a.x < o.x + o.w && a.y > o.y && a.y < o.y + o.h)
+        {
+          inAny = true;
+          a.vx += o.kx * g * h; a.vy += o.ky * g * h;
+          if (!ghost && !a.inW) { a.inW = true; sfx.wind(); }
+        }
+      }
+      if (!inAny) a.inW = false;
+      for (const o of obs)
+      {
+        if (o.t !== 'well') continue;
+        const dx = o.x - a.x, dy = o.y - a.y, d = Math.hypot(dx, dy);
+        if (d < o.R && d > 4)
+        {
+          const k = o.f * g * (1 - d / o.R);
+          a.vx += dx / d * k * h; a.vy += dy / d * k * h;
+          if (!ghost && k * h > g * h * 0.2 && !a.welled) { a.welled = true; sfx.well(); }
+        }
+      }
+      if (a.pcd <= 0) for (const o of obs)
+      {
+        if (o.t !== 'portal') continue;
+        const dA = Math.hypot(a.x - o.ax, a.y - o.ay), dB = Math.hypot(a.x - o.bx, a.y - o.by);
+        let tx = null, ty = null;
+        if (dA < o.r) { tx = o.bx; ty = o.by; }
+        else if (dB < o.r) { tx = o.ax; ty = o.ay; }
+        if (tx == null) continue;
+        const sp = Math.hypot(a.vx, a.vy) || 1, nx = a.vx / sp, ny = a.vy / sp;
+        a.x = tx + nx * (o.r + AR + 3); a.y = ty + ny * (o.r + AR + 3);
+        a.pcd = 0.35; a.vx *= 0.96; a.vy *= 0.96;
+        if (!ghost) { a.ported = true; sfx.portal(); stats.portals++; saveStats(); fxPortal(o); punch = Math.max(punch, 0.35); }
+        break;
+      }
+      if (a.x < IN + AR) { a.x = IN + AR; if (a.vx < 0) { ev = { x: IN, y: a.y, nx: 1, ny: 0, imp: -a.vx, t: 'wall' }; a.vx = -a.vx * 0.78; } }
+      else if (a.x > W - IN - AR) { a.x = W - IN - AR; if (a.vx > 0) { ev = { x: W - IN, y: a.y, nx: -1, ny: 0, imp: a.vx, t: 'wall' }; a.vx = -a.vx * 0.78; } }
+      if (a.y < IN + AR) { a.y = IN + AR; if (a.vy < 0) { if (!ev) ev = { x: a.x, y: IN, nx: 0, ny: 1, imp: -a.vy, t: 'wall' }; a.vy = -a.vy * 0.78; } }
+      else if (a.y > H - IN - AR) { a.y = H - IN - AR; if (a.vy > 0) { if (!ev) ev = { x: a.x, y: H - IN, nx: 0, ny: -1, imp: a.vy, t: 'wall' }; a.vy = -a.vy * 0.78; } }
+      if (ev)
+      {
+        const post = Math.hypot(a.vx, a.vy);
+        if (ghost) { if (ev.imp < 150 * K) { a.simStop = true; return true; } a.bounces++; }
+        else
+        {
+          if (ev.imp < 150 * K || post < 85 * K) { stickArrow(a, ev.x, ev.y, ev.nx, ev.ny); return true; }
+          a.bounces++; fxBounce(a, ev);
+        }
+      }
+      const pi = a.pierce | 0;
+      for (const o of obs)
+      {
+        let c = null, type = '', svx = 0, svy = 0, qx = a.x, qy = a.y;
+        if (o.t === 'plank' || o.t === 'move')
+        {
+          c = circleOBB(a.x, a.y, AR, o.x, o.y, o.w / 2, o.h / 2, o.a || 0); type = 'plank';
+          if (c) { qx = c.wcx; qy = c.wcy; }
+        } else if (o.t === 'bump')
+        {
+          const dx = a.x - o.x, dy = a.y - o.y, d = Math.hypot(dx, dy) || 0.0001, rr = AR + o.r;
+          if (d < rr) { const nx = dx / d, ny = dy / d; c = { nx, ny, pen: rr - d }; type = 'bump'; qx = o.x + nx * o.r; qy = o.y + ny * o.r; }
+        } else if (o.t === 'spin')
+        {
+          const ca = Math.cos(o.ang), sa = Math.sin(o.ang);
+          c = circleSeg(a.x, a.y, AR, o.x - ca * o.len, o.y - sa * o.len, o.x + ca * o.len, o.y + sa * o.len, o.th * 0.5);
+          type = 'spin';
+          if (c) { qx = c.qx; qy = c.qy; const rx = qx - o.x, ry = qy - o.y; svx = -o.sp * ry; svy = o.sp * rx; }
+        } else if (o.t === 'crate')
+        {
+          if (!o.dead)
+          {
+            c = circleOBB(a.x, a.y, AR, o.x, o.y, o.w / 2, o.h / 2, o.a || 0);
+            if (c) { o.dead = true; a.vx *= 0.9; a.vy *= 0.9; if (!ghost) fxCrate(c); }
+          }
+          continue;
+        } else continue;
+        if (!c) continue;
+        if (pi > 0 && (type === 'plank' || type === 'spin'))
+        {
+          a.pierce = pi - 1;
+          if (!ghost) { a.pierced = (a.pierced | 0) + 1; fxSlice(qx, qy); }
+          continue;
+        }
+        a.x += c.nx * c.pen; a.y += c.ny * c.pen;
+        const rvx = a.vx - svx, rvy = a.vy - svy, vn = rvx * c.nx + rvy * c.ny;
+        if (vn >= 0) continue;
+        const imp = -vn;
+        if (type === 'bump')
+        {
+          a.vx -= 2 * vn * c.nx; a.vy -= 2 * vn * c.ny;
+          const sp = Math.hypot(a.vx, a.vy) || 1;
+          const nsp = clamp(sp * 1.1 + 240 * K, 620 * K, vmax * 0.93);
+          a.vx = a.vx / sp * nsp; a.vy = a.vy / sp * nsp;
+          if (ghost) a.bounces++;
+          else if (o.cd <= 0) { o.cd = 0.07; o.pulse = 1; a.bounces++; fxBounce(a, { x: qx, y: qy, nx: c.nx, ny: c.ny, imp, t: 'bump' }); }
+        } else
+        {
+          const e = 0.76;
+          a.vx = rvx - (1 + e) * vn * c.nx + svx * 0.6;
+          a.vy = rvy - (1 + e) * vn * c.ny + svy * 0.6;
+          const post = Math.hypot(a.vx, a.vy);
+          if (ghost) { if (imp < 150 * K) { a.simStop = true; return true; } a.bounces++; }
+          else
+          {
+            if (imp < 150 * K || post < 85 * K) { stickArrow(a, qx, qy, c.nx, c.ny); return true; }
+            a.bounces++; fxBounce(a, { x: qx, y: qy, nx: c.nx, ny: c.ny, imp, t: type });
+          }
+        }
+        const sp3 = Math.hypot(a.vx, a.vy);
+        if (sp3 > vmax * 1.05) { a.vx *= vmax * 1.05 / sp3; a.vy *= vmax * 1.05 / sp3; }
+      }
+      return false;
+    }
+
+    /* ================= particles ================= */
+    const mkFloat = (x, y, txt, col, size) => ({ x, y, txt, col, size, age: 0, life: 0.95, vy: -42 });
+    function sparksBurst(x, y, n, col, spd) {
+      for (let i = 0; i < n; i++)
+      {
+        const a = rand(0, TAU), s = rand(spd * 0.4, spd);
+        sparks.push({
+          x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60, g: 600, age: 0, life: rand(0.3, 0.6),
+          kind: (rand(0, 3)) | 0, rot: rand(0, TAU), vr: rand(-8, 8), col, s: rand(2, 4) * Math.max(K, 0.8)
+        });
+      }
+    }
+    function puff(x, y) { sparksBurst(x, y, 6, INK, 120); }
+    function confetti(x, y) {
+      const cols = [ INK, ACC, BLUE, GOLD ];
+      for (let i = 0; i < 30; i++)
+      {
+        const a = rand(0, TAU), s = rand(140, 460);
+        sparks.push({
+          x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 120, g: 520, age: 0, life: rand(0.5, 1),
+          kind: (rand(0, 3)) | 0, rot: rand(0, TAU), vr: rand(-10, 10), col: cols[ (rand(0, 4)) | 0 ], s: rand(2.5, 5) * Math.max(K, 0.8)
+        });
+      }
+    }
+
+    /* ================= gameplay ================= */
+    function fire() {
+      if (mode !== 'play' || arrowsLeft <= 0 || arrows.length >= 6) return;
+      arrowsLeft--; shotsUsed++; stats.shots++; saveStats();
+      let pr = 0;
+      if (charge >= CHARGE_MAX) { pr = 3; charge = 0; }
+      const spd = lerp(0.45, 1, Math.pow(aim.p, 0.9)) * vmax;
+      arrows.push({
+        x: bow.x + aim.dx * 50 * K, y: bow.y + aim.dy * 50 * K,
+        vx: aim.dx * spd, vy: aim.dy * spd, a: Math.atan2(aim.dy, aim.dx),
+        bounces: 0, age: 0, tt: 0, slowed: false, gone: false,
+        chain: 0, pierce: pr, pierced: 0, ported: false, welled: false, pcd: 0, inW: false
+      });
+      bow.vib = 1; sfx.release(aim.p);
+      if (pr) floats.push(mkFloat(bow.x, bow.y - 52, 'PIERCE AWAY', ACC, 12));
+    }
+    function collectCoins(a) {
+      for (const c of coins)
+      {
+        if (c.got) continue;
+        const dx = a.x - c.x, dy = a.y - c.y, rr = c.r + AR + 7;
+        if (dx * dx + dy * dy > rr * rr) continue;
+        c.got = true;
+        a.chain++;
+        if (a.chain > courseBestChain) courseBestChain = a.chain;
+        if (a.chain === 3) award('chain3');
+        const v = 30 * a.chain; score += v; stats.coins++; saveStats();
+        const wasReady = charge >= CHARGE_MAX;
+        charge = Math.min(CHARGE_MAX, charge + 1);
+        if (!wasReady && charge >= CHARGE_MAX) { sfx.charge(); award('arm'); }
+        floats.push(mkFloat(c.x, c.y - 14, '+' + v, GOLDD, 12));
+        if (a.chain > 1) floats.push(mkFloat(c.x, c.y + 16, 'CHAIN ×' + a.chain, GOLDD, 10));
+        sparksBurst(c.x, c.y, 6, GOLD, 140);
+        sfx.coin(a.chain);
+        if (a.chain >= 3) punch = Math.max(punch, 0.22);
+      }
+    }
+    function hitTarget(a) {
+      a.gone = true;
+      for (const o of arrows) if (!o.gone) { o.gone = true; puff(o.x, o.y); }
+      const b = a.bounces, pb = (a.pierce | 0) > 0 ? 75 : 0;
+      const pts = 150 + 100 * b + pb;
+      score += pts; stats.hits++; saveStats();
+      if (b >= 1) award('bank');
+      if (b >= 3) award('bank3');
+      if ((a.pierced | 0) > 0) award('breach');
+      if (a.ported) award('worm');
+      if (a.welled) award('sling');
+      clearData = { shots: shotsUsed, bank: b, chain: courseBestChain, pts, spared: arrowsLeft, bonus: arrowsLeft * 150 };
+      score += clearData.bonus;
+      if (gameMode === 'inf')
+      {
+        const db = 25 * courseNo;
+        score += db; clearData.db = db;
+        if (courseNo > infBest) { infBest = courseNo; store.set('ric_infbest', infBest); }
+        if (courseNo >= 10) award('depth10');
+      } else if (gameMode === 'daily')
+      {
+        const seed = dailySeed(); let db = null;
+        try { db = JSON.parse(store.get('ric_daily') || 'null'); } catch (e) { }
+        if (!db || db.seed !== seed || score > db.score)
+        {
+          store.set('ric_daily', JSON.stringify({ seed, score }));
+          clearData.dailyBest = true;
+        }
+        award('daily'); stats.dailys++; saveStats();
+      } else if (gameMode === 'custom')
+      {
+        award('maker');
+      } else
+      {
+        savedLevel = Math.max(savedLevel, Math.min(courseNo + 1, TOUR_LEN));
+        store.set('ric_level', savedLevel);
+        if (courseNo >= TOUR_LEN) award('grad');
+      }
+      if (score > best) { best = score; newBest = true; store.set('ric_best', best); }
+      clearData.stars = shotsUsed === 1 ? 3 : shotsUsed <= par ? 2 : 1;
+      if (gameMode === 'tour' && tourStars[ courseNo - 1 ] < clearData.stars)
+      {
+        tourStars[ courseNo - 1 ] = clearData.stars; saveTour();
+      }
+      if (tourStars.filter(s => s === 3).length >= 5) award('sharp');
+      target.pulse = 1; punch = 1; flash = 0.35; shake = 6;
+      rings.push({ x: target.x, y: target.y, r0: target.r * 0.4, r1: target.r * 2.6, age: 0, life: 0.6, col: ACC, lw: 3 });
+      confetti(target.x, target.y);
+      floats.push(mkFloat(target.x, target.y - target.r - 24, 'BULLSEYE +' + pts, INK, 15));
+      if (b >= 1) floats.push(mkFloat(target.x, target.y + target.r + 26, 'BANK SHOT ×' + b, ACC, 13));
+      if (pb) floats.push(mkFloat(target.x, target.y + target.r + 44, 'PIERCING +75', ACC, 11));
+      if (clearData.db) floats.push(mkFloat(target.x, target.y + target.r + 62, 'DEPTH BONUS +' + clearData.db, GOLDD, 11));
+      if (clearData.dailyBest) floats.push(mkFloat(target.x, target.y - target.r - 44, 'NEW DAILY BEST', GOLDD, 12));
+      sfx.target(b); vib([ 20, 40, 30 ]);
+      slowmoT = Math.min(slowmoT, 0.15);
+      mode = 'clear'; clearT = 0; winShown = false;
+      aim.on = false; pid = -1;
+    }
+    function stepArrows(sdt, isMenu) {
+      for (const a of arrows)
+      {
+        if (a.gone) continue;
+        a.age += sdt;
+        a.pcd = Math.max(0, a.pcd - sdt);
+        const sp = Math.hypot(a.vx, a.vy);
+        const steps = clamp(Math.ceil(sp * sdt / 6) || 1, 1, 12), h = sdt / steps;
+        for (let i = 0; i < steps; i++)
+        {
+          a.vy += g * h; a.x += a.vx * h; a.y += a.vy * h;
+          if (resolveWorld(a, false, h)) break;
+          if (!isMenu)
+          {
+            if (Math.hypot(a.x - target.x, a.y - target.y) < target.r * 0.92) { hitTarget(a); break; }
+            collectCoins(a);
+          }
+          if (a.age > 9) { a.gone = true; puff(a.x, a.y); break; }
+        }
+        if (a.gone) continue;
+        a.a = angLerp(a.a, Math.atan2(a.vy, a.vx), 1 - Math.exp(-18 * sdt));
+        a.tt += sdt;
+        if (a.tt > 0.03)
+        {
+          a.tt = 0;
+          trailDots.push({ x: a.x, y: a.y, age: 0, life: 2.4, col: a.chain >= 3 ? GOLD : INK });
+          if (trailDots.length > 420) trailDots.shift();
+          if (!isMenu)
+          {
+            ghostTick = (ghostTick + 1) % 3;
+            if (ghostTick === 0 && ghostPath.length < 420) ghostPath.push({ x: a.x, y: a.y });
+          }
+        }
+      }
+      arrows = arrows.filter(a => !a.gone);
+    }
+    function menuFire() {
+      const ang = rand(-2.6, -0.6), dx = Math.cos(ang), dy = Math.sin(ang), spd = rand(0.55, 0.95) * vmax;
+      arrows.push({
+        x: bow.x + dx * 50 * K, y: bow.y + dy * 50 * K, vx: dx * spd, vy: dy * spd, a: ang,
+        bounces: 0, age: 0, tt: 0, slowed: false, gone: false, chain: 0, pierce: 0, pierced: 0, ported: false, welled: false, pcd: 0, inW: false
+      });
+      bow.vib = 1;
+    }
+
+    /* ================= input ================= */
+    window.addEventListener('pointerdown', e => {
+      if (mode === 'editor') { edDown(e); return; }
+      audio();
+      if (paused || mode !== 'play' || pid !== -1 || arrowsLeft <= 0) return;
+      pid = e.pointerId;
+      aim.on = true; aim.sx = aim.cx = e.clientX; aim.sy = aim.cy = e.clientY; aim.p = 0;
+      sfx.draw();
+    });
+    window.addEventListener('pointermove', e => {
+      if (mode === 'editor') { edDragMove(e); return; }
+      if (!aim.on || e.pointerId !== pid) return;
+      aim.cx = e.clientX; aim.cy = e.clientY;
+      const dx = aim.sx - aim.cx, dy = aim.sy - aim.cy, pl = Math.hypot(dx, dy);
+      if (pl > 10) { aim.dx = dx / pl; aim.dy = dy / pl; }
+      const p = clamp(pl / (0.32 * U), 0, 1);
+      if (Math.floor(p * 4) !== Math.floor(aim.p * 4)) sfx.tick2();
+      aim.p = p;
+    });
+    function endAim(e) {
+      if (mode === 'editor') { ed.drag = null; return; }
+      if (!aim.on || (e && e.pointerId !== pid)) return;
+      aim.on = false; pid = -1;
+      if (aim.p >= 0.06) fire();
+    }
+    window.addEventListener('pointerup', endAim);
+    window.addEventListener('pointercancel', endAim);
+    /* wheel rotates/sizes the selection in the workshop (desktop) */
+    window.addEventListener('wheel', e => {
+      if (mode !== 'editor' || !ed.sel) return;
+      const it = getSel(); if (!it) return;
+      const d = e.deltaY > 0 ? 1 : -1;
+      if ('a' in it && it.t !== 'move') { pushUndo(); it.a += d * Math.PI / 16; edSync(); }
+      else if (it.t === 'spin') { pushUndo(); it.sp = clamp(it.sp - d * 0.15, -3.4, 3.4); edSync(); }
+      e.preventDefault();
+    }, { passive: false });
+
+    /* keyboard: Esc pause · H hint · R restart · M mute · C calm · Del remove */
+    window.addEventListener('keydown', e => {
+      if (mode === 'editor')
+      {
+        if (e.code === 'Escape')
+        {
+          if (ed.pending) { ed.pending = null; edProps(); }
+          else if (ed.sel) { ed.sel = null; edProps(); }
+        }
+        else if (e.code === 'Delete' || e.code === 'Backspace')
+        {
+          if (ed.sel && ed.sel.k !== 'target') { pushUndo(); edAct('del', getSel()); edSync(); edProps(); }
+        }
+        return;
+      }
+      if (e.code === 'Escape' && mode === 'play') { togglePause(); }
+      else if (e.code === 'KeyH' && mode === 'play')
+      {
+        if (paused) togglePause();
+        showHint();
+      }
+      else if (e.code === 'KeyR' && mode === 'play' && !paused) { setCourse(courseNo); mode = 'play'; sfx.ui(); }
+      else if (e.code === 'KeyM') { toggleMute(); }
+      else if (e.code === 'KeyC') { toggleCalm(); }
+    });
+
+    /* ================= preview simulation ================= */
+    function specialReady() { return charge >= CHARGE_MAX; }
+    function simulate(dx, dy, spd) {
+      const a = {
+        x: bow.x + dx * 50 * K, y: bow.y + dy * 50 * K, vx: dx * spd, vy: dy * spd, bounces: 0,
+        pierce: specialReady() ? 3 : 0, pierced: 0, ported: false, welled: false, pcd: 0, simStop: false
+      };
+      const pts = []; const h = 1 / 240; let t = 0;
+      for (let i = 0; i < 300; i++)
+      {
+        a.pcd = Math.max(0, a.pcd - h);
+        a.vy += g * h; a.x += a.vx * h; a.y += a.vy * h;
+        if (resolveWorld(a, true, h)) break;
+        if (Math.hypot(a.x - target.x, a.y - target.y) < target.r * 0.92) { a.hit = true; break; }
+        t += h; if (t > 1.15 || pts.length > 40) break;
+        if (i % 5 === 0) pts.push({ x: a.x, y: a.y });
+      }
+      return { pts, hit: !!a.hit, ex: a.x, ey: a.y };
+    }
+
+    /* ================= hint ================= */
+    function showHint() {
+      if (mode !== 'play') return;
+      const p = findHint();
+      if (p) { hintPts = p; hintT = 6; stats.hints++; saveStats(); sfx.chalk(); }
+      else floats.push(mkFloat(W / 2, H * 0.45, 'NO LINE FOUND', INK, 12));
+    }
+
+    /* ================= pause / calm ================= */
+    function togglePause() {
+      if (mode !== 'play') return;
+      paused = !paused;
+      pauseOv.classList.toggle('hidden', !paused);
+      if (paused)
+      {
+        pMap.textContent = gameMode === 'custom' ? 'BACK TO WORKSHOP' : 'PUZZLE INDEX';
+        sfx.ui();
+      }
+    }
+    function toggleCalm() {
+      calm = !calm; store.set('ric_calm', calm ? '1' : '0');
+      pCalm.textContent = 'MOTION: ' + (calm ? 'CALM' : 'FULL');
+      sfx.ui();
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && mode === 'play' && !paused) togglePause();
+    });
+
+    /* ================= update ================= */
+    function update(dt) {
+      if (paused) return;
+      time += dt;
+      if (hintT > 0) hintT -= dt;
+      const want = slowmoT > 0 ? 0.3 : 1;
+      timeScale += (want - timeScale) * (1 - Math.exp(-10 * dt));
+      if (slowmoT > 0) slowmoT -= dt;
+      const sdt = dt * timeScale;
+      simTime += sdt;
+      punch *= Math.exp(-4 * dt);
+      zoom += (((slowmoT > 0 ? 1.13 : 1) + punch * 0.1) - zoom) * (1 - Math.exp(-7 * dt));
+      const zfx = (slowmoT > 0.05 || punch > 0.4) ? target.x : W / 2,
+        zfy = (slowmoT > 0.05 || punch > 0.4) ? target.y : H * 0.42;
+      fx += (zfx - fx) * (1 - Math.exp(-5 * dt)); fy += (zfy - fy) * (1 - Math.exp(-5 * dt));
+      shake *= Math.exp(-7 * dt); if (shake < 0.02) shake = 0;
+      flash *= Math.exp(-5 * dt);
+      if (calm) { shake = 0; flash = 0; }
+      bow.pull += ((aim.on ? aim.p : 0) - bow.pull) * (1 - Math.exp(-16 * dt));
+      const ta = (aim.on && aim.p > 0.03) ? Math.atan2(aim.dy, aim.dx) : -0.7 + Math.sin(time * 1.2) * 0.05;
+      bow.ang = angLerp(bow.ang, ta, 1 - Math.exp(-12 * dt));
+      bow.vib *= Math.exp(-5 * dt);
+      for (const o of obs)
+      {
+        if (o.t === 'move')
+        {
+          const s = Math.sin(simTime * o.sp + o.ph) * o.range;
+          if (o.ax === 'x') o.x = o.bx + s; else o.y = o.by + s;
+        }
+        else if (o.t === 'spin') o.ang = simTime * o.sp + o.ph;
+        else if (o.t === 'bump') { if (o.cd > 0) o.cd -= sdt; o.pulse *= Math.exp(-5 * sdt); }
+      }
+      if (target.sp) target.x = target.bx + Math.sin(simTime * target.sp) * target.mx;
+      target.pulse *= Math.exp(-4 * sdt);
+
+      if (mode === 'play' || mode === 'menu')
+      {
+        stepArrows(sdt, mode === 'menu');
+        if (mode === 'menu')
+        {
+          menuAutoT -= dt;
+          if (menuAutoT <= 0) { menuAutoT = rand(1.8, 3.2); menuFire(); }
+        } else
+        {
+          for (const a of arrows)
+          {
+            if (a.slowed || a.bounces < 1) continue;
+            const sp = Math.hypot(a.vx, a.vy); if (sp < 260 * K) continue;
+            const dx = target.x - a.x, dy = target.y - a.y, d = Math.hypot(dx, dy);
+            if (d > 0.5 * Math.max(W, H)) continue;
+            const dot = (a.vx * dx + a.vy * dy) / (sp * d);
+            if (dot < 0.5) continue;
+            const closest = Math.abs(dx * (a.vy / sp) - dy * (a.vx / sp));
+            if (closest < target.r * 1.6 && d / sp < 0.6) { a.slowed = true; slowmoT = Math.max(slowmoT, 0.6); sfx.slow(); }
+          }
+          if (arrowsLeft <= 0 && arrows.length === 0)
+          {
+            mode = 'fail'; failT = 0; loseShown = false; aim.on = false; pid = -1;
+            if (score > best) { best = score; newBest = true; store.set('ric_best', best); } else newBest = false;
+            sfx.empty();
+          }
+        }
+      } else if (mode === 'clear')
+      {
+        clearT += dt;
+        if (!winShown && clearT > 1.05) { winShown = true; showWin(); }
+      } else if (mode === 'fail')
+      {
+        failT += dt;
+        if (!loseShown && failT > 0.7) { loseShown = true; showLose(); }
+      }
+      for (const p of sparks) { p.age += sdt; p.x += p.vx * sdt; p.y += p.vy * sdt; p.vy += p.g * sdt; p.rot += p.vr * sdt; }
+      sparks = sparks.filter(p => p.age < p.life);
+      for (const r of rings) r.age += sdt; rings = rings.filter(r => r.age < r.life);
+      for (const f of floats) { f.age += sdt; f.y += f.vy * sdt; } floats = floats.filter(f => f.age < f.life);
+      for (const d of trailDots) d.age += sdt; trailDots = trailDots.filter(d => d.age < d.life);
+      for (const s of stuck) s.t += dt;
+      syncHud();
+    }
+    function syncHud() {
+      hScore.textContent = score;
+      hBest.textContent = Math.max(best, score);
+      if (mode === 'menu') hCourse.textContent = 'BANK-SHOT ARCHERY';
+      else if (mode === 'editor') hCourse.textContent = 'WORKSHOP';
+      else if (gameMode === 'daily') hCourse.textContent = 'DAILY PUZZLE';
+      else if (gameMode === 'custom') hCourse.textContent = 'WORKSHOP · PLAYTEST';
+      else hCourse.textContent = gameMode === 'tour'
+        ? 'TOUR Nº' + pad(courseNo)
+        : 'INFINITE · DEPTH ' + pad(courseNo);
+    }
+
+    /* ================= cards ================= */
+    const STAR = '<svg class="star" viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>';
+    function showWin() {
+      const tourDone = gameMode === 'tour' && courseNo >= TOUR_LEN;
+      if (gameMode === 'tour')
+        wKick.textContent = tourDone ? 'THE TOUR — COMPLETE' : 'PUZZLE Nº' + pad(courseNo) + ' — CLEAR';
+      else if (gameMode === 'daily') wKick.textContent = 'PUZZLE OF THE DAY — CLEAR';
+      else if (gameMode === 'custom') wKick.textContent = 'PLAYTEST — CLEAR';
+      else wKick.textContent = 'DEPTH ' + pad(courseNo) + ' — CLEAR';
+      wTitle.textContent = gameMode === 'custom' ? 'IT WORKS!'
+        : tourDone ? 'TWENTY FOR TWENTY' : (clearData.bank >= 2 ? 'TRICK SHOT' : 'BULLSEYE');
+      wStars.innerHTML = STAR + STAR + STAR;
+      [ ...wStars.children ].forEach((s, i) => s.classList.toggle('on', i < clearData.stars));
+      wShots.textContent = clearData.shots;
+      wBank.textContent = clearData.bank > 0 ? '×' + clearData.bank + ' · +' + clearData.bank * 100 : '—';
+      wChain.textContent = '×' + (clearData.chain || 0);
+      wSpared.textContent = '+' + clearData.bonus;
+      wPts.textContent = '+' + (clearData.pts + clearData.bonus + (clearData.db || 0));
+      wTotal.textContent = score;
+      wCta.textContent = gameMode === 'custom' ? 'BACK TO WORKSHOP'
+        : tourDone ? 'ENTER INFINITE'
+          : gameMode === 'daily' ? 'BACK TO MENU'
+            : gameMode === 'tour' ? 'NEXT PUZZLE'
+              : 'DESCEND — Nº' + pad(courseNo + 1);
+      wStamp.classList.remove('show'); void wStamp.offsetWidth;
+      wStamp.classList.toggle('show', newBest);
+      winEl.classList.remove('hidden'); winAt = performance.now();
+      sfx.fanfare();
+    }
+    function showLose() {
+      const isInf = gameMode === 'inf', isCus = gameMode === 'custom';
+      if (gameMode === 'tour')
+      {
+        lKick.textContent = 'OUT OF ARROWS';
+        lTitle.textContent = 'QUIVER EMPTY';
+        lRule.innerHTML = 'The target stands untouched — your misses are inked on the sheet. <em>Bank off the walls</em> — or press <em>H</em> for a chalked line.';
+        lScoreK.textContent = 'SCORE';
+        lDepthK.textContent = 'PUZZLE';
+        lBestWrap.style.display = 'none';
+        lCta.textContent = 'RETRY PUZZLE';
+      } else if (gameMode === 'daily')
+      {
+        lKick.textContent = 'OUT OF ARROWS';
+        lTitle.textContent = 'QUIVER EMPTY';
+        lRule.innerHTML = 'Today\'s puzzle holds. <em>Retry</em> — the layout is the same for everyone, all day.';
+        lScoreK.textContent = 'SCORE';
+        lDepthK.textContent = 'ATTEMPT';
+        lBestWrap.style.display = 'none';
+        lCta.textContent = 'RETRY DAILY';
+      } else if (isCus)
+      {
+        lKick.textContent = 'PLAYTEST — DRY';
+        lTitle.textContent = 'NEEDS TUNING';
+        lRule.innerHTML = 'The build held out. Check the <em>solver chip</em> in the workshop, loosen a lane — or accept it as a hard one.';
+        lScoreK.textContent = 'SCORE';
+        lDepthK.textContent = 'ATTEMPT';
+        lBestWrap.style.display = 'none';
+        lCta.textContent = 'RETRY TEST';
+      } else
+      {
+        lKick.textContent = 'THE PIT CLAIMS YOUR QUIVER';
+        lTitle.textContent = 'RUN OVER';
+        lRule.innerHTML = 'Depth <em>' + pad(courseNo) + '</em> is where the arrows ran dry. The depths regenerate — <em>every run, new puzzles.</em>';
+        lScoreK.textContent = 'RUN SCORE';
+        lDepthK.textContent = 'DEPTH';
+        lBestWrap.style.display = '';
+        lBestD.textContent = infBest > 0 ? pad(infBest) : '—';
+        lCta.textContent = 'NEW RUN';
+      }
+      lScore.textContent = score; lCourse.textContent = pad(courseNo);
+      lCopy.style.display = isInf ? '' : 'none';
+      lCopy.textContent = 'COPY RESULT';
+      lWork.style.display = isCus ? '' : 'none';
+      lStamp.classList.remove('show'); void lStamp.offsetWidth;
+      lStamp.classList.toggle('show', newBest);
+      loseEl.classList.remove('hidden'); loseAt = performance.now();
+    }
+    function nextCourse() {
+      winEl.classList.add('hidden'); slowmoT = 0; punch = 0;
+      if (gameMode === 'custom') { exitToEditor(); return; }
+      if (gameMode === 'daily') { goMenu(); return; }
+      if (gameMode === 'tour' && courseNo >= TOUR_LEN) { startInfinite(true); return; }
+      setCourse(courseNo + 1); mode = 'play'; sfx.ui();
+    }
+    function retryCourse() {
+      loseEl.classList.add('hidden'); slowmoT = 0; punch = 0;
+      if (gameMode === 'inf') { score = 0; charge = 0; setCourse(1); }
+      else if (gameMode === 'custom') { score = 0; charge = 0; setCourse(1); }
+      else setCourse(gameMode === 'daily' ? 1 : courseNo);
+      mode = 'play'; sfx.ui();
+    }
+
+    /* ================= puzzle index & studio log ================= */
+    function renderMap() {
+      mapGrid.innerHTML = '';
+      for (let i = 0; i < TOUR_LEN; i++)
+      {
+        const un = (i + 1) <= savedLevel;
+        const b = document.createElement('button');
+        b.className = 'mtile' + (un ? '' : ' lock') + (tourStars[ i ] > 0 ? ' done' : '');
+        let dots = '';
+        for (let k = 0; k < 3; k++)dots += '<i class="' + (k < tourStars[ i ] ? 'on' : '') + '"></i>';
+        b.innerHTML = '<span class="mn">' + pad(i + 1) + '</span><span class="md">' + dots + '</span>';
+        if (un) b.addEventListener('click', ev => { ev.stopPropagation(); startTour(i + 1); });
+        mapGrid.appendChild(b);
+      }
+      mapFoot.textContent = tourStarSum() + ' / ' + (3 * TOUR_LEN) + ' STARS EARNED — CLEAR A PUZZLE TO UNLOCK THE NEXT';
+    }
+    function renderStats() {
+      const rows = [
+        [ 'ARROWS LOOSED', stats.shots ],
+        [ 'BULLSEYES', stats.hits ],
+        [ 'BANKS', stats.banks ],
+        [ 'COINS TAKEN', stats.coins ],
+        [ 'PLANKS PIERCED', stats.pierces ],
+        [ 'CRATES SMASHED', stats.crates ],
+        [ 'PORTALS USED', stats.portals ],
+        [ 'CHALK LINES', stats.hints ],
+        [ 'BEST DEPTH', pad(infBest) ],
+        [ 'DAILY CLEARS', stats.dailys ]
+      ];
+      statList.innerHTML = rows.map(r =>
+        '<div class="row"><span>' + r[ 0 ] + '</span><b>' + r[ 1 ] + '</b></div>'
+      ).join('');
+    }
+
+    /* ================= drawing ================= */
+    const SC = () => Math.max(K, 0.8);
+    function drawArrowBody(L, col) {
+      const s = SC();
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineCap = 'round';
+      ctx.lineWidth = 3 * s;
+      ctx.beginPath(); ctx.moveTo(-L, 0); ctx.lineTo(-8 * s, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-10 * s, -5 * s); ctx.lineTo(-10 * s, 5 * s); ctx.closePath(); ctx.fill();
+      ctx.lineWidth = 2.6 * s;
+      ctx.beginPath();
+      ctx.moveTo(-L + 2 * s, -1); ctx.lineTo(-L + 11 * s, -8 * s);
+      ctx.moveTo(-L + 2 * s, 1); ctx.lineTo(-L + 11 * s, 8 * s); ctx.stroke();
+    }
+    function miniArrowAt(x, y) {
+      ctx.save(); ctx.translate(x, y);
+      ctx.strokeStyle = ctx.fillStyle = INK; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(5, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(4, -3.6); ctx.lineTo(4, 3.6); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-1, 0); ctx.lineTo(-5, -4); ctx.moveTo(-1, 0); ctx.lineTo(-5, 4); ctx.stroke();
+      ctx.restore();
+    }
+    function rrectPath(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+    function drawSheet() {
+      ctx.strokeStyle = 'rgba(25,22,18,0.16)'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(12.5, 12.5, W - 25, H - 25);
+      ctx.strokeStyle = 'rgba(25,22,18,0.3)'; ctx.lineWidth = 1;
+      for (const [ x, y ] of [ [ 26, 26 ], [ W - 26, 26 ], [ 26, H - 26 ], [ W - 26, H - 26 ] ])
+      {
+        ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5); ctx.stroke();
+      }
+      ctx.font = `800 ${Math.round(U * 0.52)}px "Bricolage Grotesque", sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(25,22,18,0.05)';
+      ctx.fillText(mode === 'menu' ? 'R' : mode === 'editor' ? 'W' : pad(courseNo), W / 2, H * 0.44);
+      ctx.font = '10px "Space Mono", monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = 'rgba(25,22,18,0.42)';
+      let foot;
+      if (mode === 'menu') foot = 'RICOCHET · SHEET Nº8 · THE WORKSHOP';
+      else if (mode === 'editor') foot = 'WORKSHOP · ' + (ed.verify || '—');
+      else if (gameMode === 'custom') foot = 'WORKSHOP BUILD · PLAYTEST';
+      else
+      {
+        let head;
+        if (gameMode === 'tour') head = 'PUZZLE Nº' + pad(courseNo) + ' · ' + courseName.toUpperCase();
+        else if (gameMode === 'daily') head = 'DAILY · ' + dailyLabel();
+        else head = 'INFINITE · DEPTH ' + pad(courseNo);
+        const vp = (typeof courseDef.paths === 'number' && courseDef.paths > 0) ? Math.min(courseDef.paths, 3) : 0;
+        foot = head + ' — ' + (vp > 0 ? (vp >= 3 ? '3+' : String(vp)) + ' SOLVER-VERIFIED PATH' + (vp === 1 ? '' : 'S') : 'BANK SHOTS PAY');
+      }
+      ctx.fillText(foot, W - 24, H - 13);
+      if (mode === 'play' && courseNo === 1 && gameMode === 'tour' && shotsUsed === 0 && !aim.on)
+      {
+        const al = 0.3 + 0.25 * Math.sin(time * 3.2);
+        ctx.font = '700 11px "Space Mono", monospace'; ctx.textAlign = 'center';
+        ctx.fillStyle = `rgba(25,22,18,${al})`;
+        ctx.fillText('TOUCH & DRAG BACK — RELEASE TO FIRE', W / 2, bow.y + 56);
+      }
+    }
+    function drawEditorDecor() {
+      ctx.fillStyle = 'rgba(25,22,18,0.07)';
+      for (let x = 44; x < W - 30; x += 44)for (let y = 76; y < H - 42; y += 44)ctx.fillRect(x, y, 1.6, 1.6);
+      ctx.setLineDash([ 4, 6 ]); ctx.strokeStyle = 'rgba(226,72,43,0.45)'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(bow.x, bow.y, 100, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+      if (ed.pending)
+      {
+        ctx.setLineDash([ 3, 5 ]); ctx.strokeStyle = ACC; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(ed.pending.x * W, ed.pending.y * H, 14, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      const r = selRing(ed.sel);
+      if (r)
+      {
+        ctx.setLineDash([ 4, 5 ]); ctx.strokeStyle = ACC; ctx.lineWidth = 2;
+        if (r.portal)
+        {
+          const o = r.portal;
+          ctx.beginPath(); ctx.arc(o.ax * W, o.ay * H, o.r * U + 8, 0, TAU); ctx.stroke();
+          ctx.beginPath(); ctx.arc(o.bx * W, o.by * H, o.r * U + 8, 0, TAU); ctx.stroke();
+        } else if (r.rect)
+        {
+          ctx.strokeRect(r.x - r.w / 2 - 6, r.y - r.h / 2 - 6, r.w + 12, r.h + 12);
+        } else
+        {
+          ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, TAU); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+    }
+    function drawGhost() {
+      ctx.fillStyle = 'rgba(25,22,18,0.11)';
+      for (const p of ghostPath) { ctx.beginPath(); ctx.arc(p.x, p.y, 1.7, 0, TAU); ctx.fill(); }
+    }
+    function drawHint() {
+      if (hintT <= 0 || hintPts.length < 2) return;
+      const al = Math.min(1, hintT / 1.2) * 0.75;
+      ctx.save();
+      ctx.globalAlpha = al;
+      ctx.strokeStyle = ACC; ctx.lineWidth = 2;
+      ctx.setLineDash([ 2, 9 ]);
+      ctx.lineDashOffset = -time * 40;
+      ctx.beginPath();
+      ctx.moveTo(hintPts[ 0 ].x, hintPts[ 0 ].y);
+      for (let i = 1; i < hintPts.length; i++)ctx.lineTo(hintPts[ i ].x, hintPts[ i ].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const e = hintPts[ hintPts.length - 1 ];
+      ctx.beginPath(); ctx.arc(e.x, e.y, 7, 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
+    function drawSplats() {
+      for (const s of splats)
+      {
+        ctx.fillStyle = s.acc ? 'rgba(226,72,43,0.2)' : 'rgba(25,22,18,0.09)';
+        for (const p of s.pts) { ctx.beginPath(); ctx.arc(s.x + p.dx, s.y + p.dy, p.r, 0, TAU); ctx.fill(); }
+      }
+    }
+    function drawWindZones() {
+      for (const o of obs)
+      {
+        if (o.t !== 'wind') continue;
+        const B = 'rgba(43,63,191,';
+        ctx.fillStyle = B + '0.045)'; ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.save(); ctx.beginPath(); ctx.rect(o.x, o.y, o.w, o.h); ctx.clip();
+        ctx.strokeStyle = B + '0.09)'; ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        const sp2 = 14;
+        for (let d = -o.h; d < o.w + o.h; d += sp2)
+        {
+          ctx.moveTo(o.x + d, o.y); ctx.lineTo(o.x + d + o.h, o.y + o.h);
+        }
+        ctx.stroke();
+        const ang = Math.atan2(o.ky, o.kx), L = Math.hypot(o.w, o.h);
+        for (let i = 0; i < 3; i++)
+        {
+          const p = ((time * 0.22 + i / 3) % 1);
+          const off = (p - 0.5) * L * 0.8;
+          const x = o.x + o.w / 2 + Math.cos(ang) * off, y = o.y + o.h / 2 + Math.sin(ang) * off;
+          const al = Math.sin(p * Math.PI);
+          ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+          ctx.strokeStyle = B + (0.55 * al) + ')'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(-5, -5); ctx.lineTo(3, 0); ctx.lineTo(-5, 5); ctx.stroke();
+          ctx.restore();
+        }
+        ctx.restore();
+        ctx.strokeStyle = B + '0.5)'; ctx.lineWidth = 1.4; ctx.setLineDash([ 3, 6 ]);
+        ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.setLineDash([]);
+      }
+    }
+    function drawWells() {
+      for (const o of obs)
+      {
+        if (o.t !== 'well') continue;
+        ctx.save(); ctx.translate(o.x, o.y);
+        ctx.fillStyle = 'rgba(25,22,18,0.05)';
+        ctx.beginPath(); ctx.arc(0, 0, o.R, 0, TAU); ctx.fill();
+        ctx.setLineDash([ 3, 8 ]);
+        ctx.strokeStyle = 'rgba(25,22,18,0.35)'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(0, 0, o.R, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+        const rot = time * 1.1;
+        ctx.lineWidth = 2.2; ctx.strokeStyle = INK; ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++)
+        {
+          const rr = o.R * (0.32 + i * 0.22);
+          const a0 = rot * (i % 2 ? -1.3 : 1) + i * 2.1;
+          ctx.beginPath(); ctx.arc(0, 0, rr, a0, a0 + Math.PI * 1.15); ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(0, 0, 5, 0, TAU); ctx.fillStyle = INK; ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU);
+        ctx.strokeStyle = ACC; ctx.lineWidth = 2; ctx.stroke();
+        ctx.restore();
+      }
+    }
+    function drawPortalEnd(x, y, r, dir) {
+      ctx.save(); ctx.translate(x, y);
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = ACC; ctx.lineWidth = 2.2;
+      ctx.setLineDash([ 6, 7 ]); ctx.lineDashOffset = time * 26 * dir;
+      ctx.beginPath(); ctx.arc(0, 0, r - 5, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+      const sw = time * 2.4 * dir;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.45, sw, sw + Math.PI * 1.2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.45, sw + Math.PI, sw + Math.PI * 2.2); ctx.stroke();
+      ctx.fillStyle = ACC; ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+    function drawPortals() {
+      for (const o of obs)
+      {
+        if (o.t !== 'portal') continue;
+        ctx.strokeStyle = 'rgba(25,22,18,0.12)'; ctx.lineWidth = 1.4; ctx.setLineDash([ 2, 7 ]);
+        ctx.beginPath(); ctx.moveTo(o.ax, o.ay); ctx.lineTo(o.bx, o.by); ctx.stroke(); ctx.setLineDash([]);
+        drawPortalEnd(o.ax, o.ay, o.r, 1);
+        drawPortalEnd(o.bx, o.by, o.r, -1);
+      }
+    }
+    function drawCoins() {
+      for (const c of coins)
+      {
+        if (c.got) continue;
+        const bob = Math.sin(time * 2 + c.ph) * 3;
+        const sq = 0.4 + 0.6 * Math.abs(Math.cos(time * 1.6 + c.ph));
+        ctx.save(); ctx.translate(c.x, c.y + bob); ctx.scale(sq, 1);
+        ctx.fillStyle = GOLD;
+        ctx.beginPath(); ctx.arc(0, 0, c.r, 0, TAU); ctx.fill();
+        ctx.lineWidth = 2.4; ctx.strokeStyle = INK; ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, c.r * 0.55, 0, TAU); ctx.stroke();
+        ctx.restore();
+      }
+    }
+    function drawObstacles() {
+      for (const o of obs)
+      {
+        if (o.t === 'wind' || o.t === 'portal' || o.t === 'well') continue;
+        if (o.t === 'move')
+        {
+          ctx.setLineDash([ 2, 7 ]); ctx.strokeStyle = 'rgba(25,22,18,0.15)'; ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          if (o.ax === 'x') { ctx.moveTo(o.bx - o.range - o.w / 2, o.by); ctx.lineTo(o.bx + o.range + o.w / 2, o.by); }
+          else { ctx.moveTo(o.bx, o.by - o.range - o.h / 2); ctx.lineTo(o.bx, o.by + o.range + o.h / 2); }
+          ctx.stroke(); ctx.setLineDash([]);
+        }
+        if (o.t === 'spin')
+        {
+          ctx.setLineDash([ 2, 8 ]); ctx.strokeStyle = 'rgba(25,22,18,0.14)'; ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.arc(o.x, o.y, o.len, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+          const ca = Math.cos(o.ang), sa = Math.sin(o.ang);
+          ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = o.th;
+          ctx.beginPath(); ctx.moveTo(o.x - ca * o.len, o.y - sa * o.len); ctx.lineTo(o.x + ca * o.len, o.y + sa * o.len); ctx.stroke();
+          ctx.fillStyle = ACC;
+          ctx.beginPath(); ctx.arc(o.x + ca * o.len, o.y + sa * o.len, 4, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(o.x - ca * o.len, o.y - sa * o.len, 4, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, TAU); ctx.fillStyle = PAPER; ctx.fill();
+          ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
+        } else if (o.t === 'bump')
+        {
+          ctx.setLineDash([ 2, 7 ]); ctx.strokeStyle = 'rgba(25,22,18,0.14)'; ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.arc(o.x, o.y, o.r + 9, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, TAU); ctx.fillStyle = PAPER; ctx.fill();
+          ctx.lineWidth = 3.2; ctx.strokeStyle = INK; ctx.stroke();
+          ctx.beginPath(); ctx.arc(o.x, o.y, o.r * 0.62, 0, TAU); ctx.strokeStyle = ACC; ctx.lineWidth = 2.4; ctx.stroke();
+          ctx.beginPath(); ctx.arc(o.x, o.y, o.r * 0.22, 0, TAU); ctx.fillStyle = ACC; ctx.fill();
+          if (o.pulse > 0.02)
+          {
+            ctx.globalAlpha = o.pulse;
+            ctx.beginPath(); ctx.arc(o.x, o.y, o.r * (1 + (1 - o.pulse) * 0.5), 0, TAU);
+            ctx.strokeStyle = ACC; ctx.lineWidth = 3; ctx.stroke(); ctx.globalAlpha = 1;
+          }
+        } else if (o.t === 'crate')
+        {
+          ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.a || 0);
+          const w = o.w, h = o.h;
+          if (o.dead)
+          {
+            ctx.globalAlpha = 0.18; ctx.setLineDash([ 3, 4 ]);
+            ctx.strokeStyle = INK; ctx.lineWidth = 1.6;
+            ctx.strokeRect(-w / 2, -h / 2, w, h);
+            ctx.setLineDash([]); ctx.globalAlpha = 1;
+          } else
+          {
+            ctx.fillStyle = PAPER; ctx.fillRect(-w / 2, -h / 2, w, h);
+            ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(-w / 2, -h / 2, w, h);
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(w / 2, h / 2);
+            ctx.moveTo(w / 2, -h / 2); ctx.lineTo(-w / 2, h / 2); ctx.stroke();
+            ctx.fillStyle = INK;
+            for (const [ sx, sy ] of [ [ -1, -1 ], [ 1, -1 ], [ -1, 1 ], [ 1, 1 ] ])
+            {
+              ctx.beginPath(); ctx.arc(sx * (w / 2 - 4), sy * (h / 2 - 4), 1.8, 0, TAU); ctx.fill();
+            }
+          }
+          ctx.restore();
+        } else
+        {
+          ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.a || 0);
+          const w = o.w, h = o.h;
+          ctx.fillStyle = PAPER; rrectPath(-w / 2, -h / 2, w, h, 4); ctx.fill();
+          ctx.save(); ctx.clip();
+          ctx.strokeStyle = 'rgba(25,22,18,0.28)'; ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          for (let x = -w / 2 - h; x < w / 2 + h; x += 9) { ctx.moveTo(x, -h / 2 - 3); ctx.lineTo(x + h, h / 2 + 3); }
+          ctx.stroke(); ctx.restore();
+          ctx.strokeStyle = INK; ctx.lineWidth = 3; rrectPath(-w / 2, -h / 2, w, h, 4); ctx.stroke();
+          ctx.fillStyle = o.t === 'move' ? ACC : INK;
+          ctx.beginPath(); ctx.arc(-w / 2 + 7, 0, 2.2, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(w / 2 - 7, 0, 2.2, 0, TAU); ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+    function drawTarget() {
+      const t = target;
+      if (t.mx)
+      {
+        ctx.setLineDash([ 2, 7 ]); ctx.strokeStyle = 'rgba(25,22,18,0.2)'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(t.bx - t.mx - t.r, t.by); ctx.lineTo(t.bx + t.mx + t.r, t.by); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.save(); ctx.translate(t.x, t.y);
+      const pr = 1 + t.pulse * 0.15; ctx.scale(pr, pr);
+      const R = t.r;
+      ctx.fillStyle = PAPER; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.fillStyle = ACC; ctx.beginPath(); ctx.arc(0, 0, R * 0.72, 0, TAU); ctx.fill();
+      ctx.fillStyle = PAPER; ctx.beginPath(); ctx.arc(0, 0, R * 0.45, 0, TAU); ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.fillStyle = ACC; ctx.beginPath(); ctx.arc(0, 0, R * 0.16, 0, TAU); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++)
+      {
+        const a2 = i * Math.PI / 2 + Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a2) * (R + 4), Math.sin(a2) * (R + 4));
+        ctx.lineTo(Math.cos(a2) * (R + 11), Math.sin(a2) * (R + 11)); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function drawStuck() {
+      const s = SC();
+      for (const st of stuck)
+      {
+        const wob = Math.sin(st.t * 34) * 0.14 * Math.exp(-st.t * 2.4);
+        ctx.save(); ctx.translate(st.x, st.y); ctx.rotate(st.a + wob); ctx.globalAlpha = 0.55;
+        drawArrowBody(32 * s, INK);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+    function drawArrows() {
+      const s = SC();
+      for (const a of arrows)
+      {
+        const sp = Math.hypot(a.vx, a.vy);
+        const col = (a.pierce | 0) > 0 ? ACC : (slowmoT > 0 ? ACC : INK);
+        ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(a.a);
+        if (sp > 400)
+        {
+          ctx.globalAlpha = 0.15; ctx.strokeStyle = col; ctx.lineWidth = 3 * s; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(-10 * s, 0); ctx.lineTo(-10 * s - Math.min(sp * 0.04, 60), 0); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        drawArrowBody(34 * s, col);
+        ctx.restore();
+      }
+    }
+    function drawTrails() {
+      const s = SC();
+      for (const d of trailDots)
+      {
+        ctx.globalAlpha = (1 - d.age / d.life) * 0.3;
+        ctx.fillStyle = d.col || INK;
+        ctx.beginPath(); ctx.arc(d.x, d.y, 2 * s, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    function drawBow() {
+      ctx.save(); ctx.translate(bow.x, bow.y); ctx.rotate(bow.ang);
+      const s = SC(), Rb = 40 * s, cx0 = -14 * s, spread = 0.98;
+      const tipX = cx0 + Rb * Math.cos(spread), tipY = Rb * Math.sin(spread);
+      let nockX = tipX - 6 * s - 26 * s * bow.pull;
+      if (bow.vib > 0.02) nockX = tipX - 6 * s + Math.sin(time * 70) * 7 * s * bow.vib;
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(tipX, -tipY); ctx.lineTo(nockX, 0); ctx.lineTo(tipX, tipY); ctx.stroke();
+      ctx.lineWidth = 4.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(cx0, 0, Rb, -spread, spread); ctx.stroke();
+      ctx.strokeStyle = ACC; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(cx0 + Rb, -8 * s); ctx.lineTo(cx0 + Rb, 8 * s); ctx.stroke();
+      if (mode === 'play' && arrowsLeft > 0 && bow.vib < 0.5)
+      {
+        ctx.save(); ctx.translate(nockX + 44 * s, 0);
+        drawArrowBody(44 * s, specialReady() ? ACC : INK);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    function drawGauge() {
+      if (mode !== 'play' || !aim.on || aim.p <= 0.03) return;
+      const s = SC();
+      const w = 64 * s, h = 7 * s, gx = bow.x - w / 2, gy = bow.y - 74 * s;
+      ctx.strokeStyle = 'rgba(25,22,18,0.55)'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(gx, gy, w, h);
+      ctx.fillStyle = specialReady() ? ACC : INK;
+      ctx.fillRect(gx + 2, gy + 2, (w - 4) * aim.p, h - 4);
+      ctx.font = '700 8px "Space Mono", monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = 'rgba(25,22,18,0.5)';
+      ctx.fillText('PULL', bow.x, gy - 4);
+    }
+    function drawPreview() {
+      if (!(aim.on && aim.p > 0.05 && mode === 'play')) return;
+      const s = SC();
+      const spd = lerp(0.45, 1, Math.pow(aim.p, 0.9)) * vmax;
+      const sim = simulate(aim.dx, aim.dy, spd);
+      const col = specialReady() ? ACC : INK;
+      for (let i = 0; i < sim.pts.length; i++)
+      {
+        const p = sim.pts[ i ], al = 1 - i / sim.pts.length;
+        ctx.globalAlpha = 0.15 + 0.5 * al;
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2.4 * s * (0.6 + 0.4 * al), 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      if (sim.hit)
+      {
+        ctx.strokeStyle = col; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(sim.ex, sim.ey, 8 * s, 0, TAU); ctx.stroke();
+      }
+    }
+    function drawFX() {
+      const s = SC();
+      for (const p of sparks)
+      {
+        const al = clamp(1 - p.age / p.life, 0, 1);
+        ctx.globalAlpha = al; ctx.fillStyle = ctx.strokeStyle = p.col;
+        if (p.kind === 0)
+        {
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+          ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-p.s, 0); ctx.lineTo(p.s, 0); ctx.stroke(); ctx.restore();
+        } else if (p.kind === 1)
+        {
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+          ctx.beginPath(); ctx.moveTo(p.s, 0); ctx.lineTo(-p.s * 0.7, p.s * 0.75); ctx.lineTo(-p.s * 0.7, -p.s * 0.75);
+          ctx.closePath(); ctx.fill(); ctx.restore();
+        } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.s * 0.6, 0, TAU); ctx.fill(); }
+      }
+      for (const r of rings)
+      {
+        const p = clamp(r.age / r.life, 0, 1);
+        ctx.globalAlpha = (1 - p) * 0.55;
+        ctx.strokeStyle = r.col; ctx.lineWidth = (r.lw || 2) * (1 - p) + 0.5;
+        ctx.beginPath(); ctx.arc(r.x, r.y, lerp(r.r0, r.r1, easeOutCubic(p)), 0, TAU); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      for (const f of floats)
+      {
+        const p = clamp(f.age / f.life, 0, 1);
+        ctx.globalAlpha = 1 - p * p;
+        ctx.font = `700 ${f.size}px "Space Mono", monospace`;
+        ctx.fillStyle = f.col;
+        ctx.fillText(f.txt, f.x, f.y);
+      }
+      ctx.globalAlpha = 1;
+    }
+    function drawCharge() {
+      if (mode !== 'play') return;
+      const gx = 28, gy = H - 56;
+      if (specialReady())
+      {
+        const p = 0.75 + 0.25 * Math.sin(time * 5);
+        ctx.save(); ctx.translate(gx + 8, gy); ctx.rotate(Math.PI / 4);
+        ctx.globalAlpha = p; ctx.fillStyle = ACC;
+        ctx.fillRect(-6, -6, 12, 12); ctx.restore(); ctx.globalAlpha = 1;
+        ctx.strokeStyle = INK; ctx.lineWidth = 1.6;
+        ctx.save(); ctx.translate(gx + 8, gy); ctx.rotate(Math.PI / 4);
+        ctx.strokeRect(-6, -6, 12, 12); ctx.restore();
+        ctx.font = '700 9px "Space Mono", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = ACC;
+        ctx.fillText('PIERCE ARMED', gx + 24, gy + 3);
+      } else
+      {
+        for (let i = 0; i < CHARGE_MAX; i++)
+        {
+          ctx.beginPath(); ctx.arc(gx + i * 14, gy, 4.2, 0, TAU);
+          if (i < charge) { ctx.fillStyle = GOLD; ctx.fill(); }
+          ctx.strokeStyle = 'rgba(25,22,18,0.4)'; ctx.lineWidth = 1.4; ctx.stroke();
+        }
+      }
+    }
+    function drawQuiver() {
+      if (mode !== 'play') return;
+      if (arrowsLeft <= 0)
+      {
+        if (mode === 'play')
+        {
+          const al = 0.5 + 0.4 * Math.sin(time * 5);
+          ctx.font = '700 11px "Space Mono", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+          ctx.fillStyle = `rgba(226,72,43,${al})`;
+          ctx.fillText('LAST ARROW AWAY', 28, H - 28);
+        }
+        return;
+      }
+      const n = Math.min(arrowsLeft, 8);
+      for (let i = 0; i < n; i++)miniArrowAt(30 + i * 22, H - 32);
+      if (arrowsLeft > 8)
+      {
+        ctx.font = '700 11px "Space Mono", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = 'rgba(25,22,18,0.85)';
+        ctx.fillText('+' + (arrowsLeft - 8), 30 + n * 22 + 4, H - 28);
+      }
+    }
+    function render() {
+      ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H);
+      ctx.save();
+      if (shake > 0.1) ctx.translate(rand(-shake, shake), rand(-shake, shake));
+      drawSheet();
+      ctx.save();
+      ctx.translate(fx, fy); ctx.scale(zoom, zoom); ctx.translate(-fx, -fy);
+      if (mode === 'editor') drawEditorDecor();
+      drawSplats();
+      drawGhost();
+      drawHint();
+      drawWindZones();
+      drawWells();
+      drawPortals();
+      drawObstacles();
+      drawCoins();
+      drawTarget();
+      drawStuck();
+      drawTrails();
+      drawArrows();
+      drawBow();
+      drawPreview();
+      drawFX();
+      ctx.restore();
+      ctx.restore();
+      drawQuiver();
+      drawCharge();
+      drawGauge();
+      if (flash > 0.01) { ctx.globalAlpha = flash * 0.2; ctx.fillStyle = ACC; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+    }
+
+    /* ================= UI wiring ================= */
+    function syncMuteIcon() { icOn.style.display = muted ? 'none' : 'block'; icOff.style.display = muted ? 'block' : 'none'; }
+    function toggleMute() {
+      muted = !muted; store.set('ric_muted', muted ? '1' : '0');
+      if (master) master.gain.value = muted ? 0 : 0.5;
+      syncMuteIcon();
+    }
+    syncMuteIcon();
+    muteBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    muteBtn.addEventListener('click', e => { e.stopPropagation(); toggleMute(); });
+    pauseB.addEventListener('pointerdown', e => e.stopPropagation());
+    pauseB.addEventListener('click', e => { e.stopPropagation(); togglePause(); });
+    tourBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    tourBtn.addEventListener('click', e => { e.stopPropagation(); audio(); startTour(); });
+    infBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    infBtn.addEventListener('click', e => { e.stopPropagation(); audio(); startInfinite(false); });
+    dailyBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    dailyBtn.addEventListener('click', e => { e.stopPropagation(); audio(); startDaily(); });
+    workBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    workBtn.addEventListener('click', e => { e.stopPropagation(); audio(); openEditor(); });
+    statBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    statBtn.addEventListener('click', e => { e.stopPropagation(); audio(); renderStats(); statOv.classList.remove('hidden'); });
+    statClose.addEventListener('pointerdown', e => e.stopPropagation());
+    statClose.addEventListener('click', e => { e.stopPropagation(); statOv.classList.add('hidden'); });
+    statOv.addEventListener('pointerdown', e => e.stopPropagation());
+    mapBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    mapBtn.addEventListener('click', e => { e.stopPropagation(); audio(); renderMap(); mapOv.classList.remove('hidden'); });
+    mapClose.addEventListener('pointerdown', e => e.stopPropagation());
+    mapClose.addEventListener('click', e => { e.stopPropagation(); mapOv.classList.add('hidden'); });
+    /* editor chrome */
+    const stop = el => { el.addEventListener('pointerdown', e => e.stopPropagation()); };
+    [ $('edTest'), $('edUndo'), $('edAm'), $('edAp'), $('edSlots'), $('edShare'), $('edClear'), $('edExit') ].forEach(stop);
+    $('edTest').addEventListener('click', e => { e.stopPropagation(); startCustom(); });
+    $('edUndo').addEventListener('click', e => { e.stopPropagation(); undoEd(); });
+    $('edAm').addEventListener('click', e => { e.stopPropagation(); pushUndo(); ed.def.arrows = clamp(ed.def.arrows - 1, 1, 9); edSync(); });
+    $('edAp').addEventListener('click', e => { e.stopPropagation(); pushUndo(); ed.def.arrows = clamp(ed.def.arrows + 1, 1, 9); edSync(); });
+    $('edSlots').addEventListener('click', e => { e.stopPropagation(); renderSlots(); slotsOv.classList.remove('hidden'); });
+    $('edShare').addEventListener('click', e => { e.stopPropagation(); openShare(encodeDef(ed.def)); });
+    $('edClear').addEventListener('click', e => { e.stopPropagation(); pushUndo(); ed.def = starterDef(); ed.sel = null; ed.pending = null; edSync(); edProps(); sfx.thunk(); });
+    $('edExit').addEventListener('click', e => { e.stopPropagation(); goMenu(); });
+    /* slots overlay */
+    stop(slotsOv); stop($('slotSave')); stop($('slotImport')); stop($('slotClose'));
+    $('slotSave').addEventListener('click', e => {
+      e.stopPropagation();
+      const free = slots.findIndex(s => !s);
+      const idx = free >= 0 ? free : (slots.length < 8 ? slots.length : -1);
+      if (idx < 0) { edFloat('SLOTS FULL — DELETE ONE OR SHARE'); return; }
+      slots[ idx ] = { name: ed.def.name || ('BUILD ' + (idx + 1)), def: cloneDef(ed.def), ts: Date.now() };
+      saveSlots(); renderSlots(); sfx.place();
+    });
+    $('slotImport').addEventListener('click', e => { e.stopPropagation(); openShare('', true); });
+    $('slotClose').addEventListener('click', e => { e.stopPropagation(); slotsOv.classList.add('hidden'); });
+    /* share overlay */
+    stop(shareOv); stop(shareTa); stop($('shareCopy')); stop($('shareImport')); stop($('shareClose'));
+    $('shareCopy').addEventListener('click', e => {
+      e.stopPropagation();
+      const txt = shareTa.value;
+      const done = () => { $('shareCopy').textContent = 'COPIED ✓'; setTimeout(() => { $('shareCopy').textContent = 'COPY'; }, 1600); };
+      const fb = () => {
+        shareTa.select();
+        try { document.execCommand('copy'); done(); } catch (err) { }
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText)
+      {
+        navigator.clipboard.writeText(txt).then(done, fb);
+      } else fb();
+    });
+    $('shareImport').addEventListener('click', e => {
+      e.stopPropagation();
+      try
+      {
+        const d = decodeDef(shareTa.value);
+        pushUndo();
+        ed.def = d; ed.sel = null; ed.pending = null;
+        edSync(); edProps();
+        shareOv.classList.add('hidden');
+        sfx.place();
+      } catch (err) { edFloat('INVALID CODE'); }
+    });
+    $('shareClose').addEventListener('click', e => { e.stopPropagation(); shareOv.classList.add('hidden'); });
+    /* pause menu */
+    stop(pResume); stop(pHint); stop(pRestart); stop(pMap); stop(pCalm); stop(pQuit);
+    pResume.addEventListener('click', e => { e.stopPropagation(); togglePause(); });
+    pHint.addEventListener('click', e => { e.stopPropagation(); if (paused) togglePause(); showHint(); });
+    pRestart.addEventListener('click', e => { e.stopPropagation(); setCourse(courseNo); mode = 'play'; sfx.ui(); });
+    pMap.addEventListener('click', e => {
+      e.stopPropagation();
+      if (gameMode === 'custom') { exitToEditor(); }
+      else { goMenu(); renderMap(); mapOv.classList.remove('hidden'); }
+    });
+    pCalm.addEventListener('click', e => { e.stopPropagation(); toggleCalm(); });
+    pQuit.addEventListener('click', e => { e.stopPropagation(); goMenu(); });
+    winEl.addEventListener('pointerdown', e => { e.stopPropagation(); if (performance.now() - winAt > 350) nextCourse(); });
+    loseEl.addEventListener('pointerdown', e => { e.stopPropagation(); if (performance.now() - loseAt > 350) retryCourse(); });
+    stop(lWork);
+    lWork.addEventListener('click', e => { e.stopPropagation(); exitToEditor(); });
+    stop(lCopy);
+    lCopy.addEventListener('click', e => {
+      e.stopPropagation();
+      const txt = 'RICOCHET — INFINITE\nDepth ' + pad(courseNo) + ' · ' + score + ' PTS · Best depth ' + pad(infBest) + '\n' + dailyLabel() + ' ' + new Date().getFullYear();
+      const done = () => { lCopy.textContent = 'COPIED ✓'; setTimeout(() => { lCopy.textContent = 'COPY RESULT'; }, 1800); };
+      const fb = () => {
+        const ta = document.createElement('textarea');
+        ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (err) { }
+        ta.remove();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText)
+      {
+        navigator.clipboard.writeText(txt).then(done, fb);
+      } else fb();
+    });
+    stop(resetP);
+    resetP.addEventListener('click', e => {
+      e.stopPropagation();
+      if (resetP.dataset.arm)
+      {
+        store.set('ric_level', 1); store.set('ric_best', 0);
+        store.set('ric_infbest', 0); store.set('ric_ach', '[]');
+        store.set('ric_stats', JSON.stringify({ shots: 0, hits: 0, banks: 0, coins: 0, crates: 0, portals: 0, pierces: 0, hints: 0, dailys: 0 }));
+        tourStars = new Array(TOUR_LEN).fill(0); saveTour();
+        best = 0; savedLevel = 1; infBest = 0; ach = new Set();
+        stats = { shots: 0, hits: 0, banks: 0, coins: 0, crates: 0, portals: 0, pierces: 0, hints: 0, dailys: 0 };
+        resetP.dataset.arm = ''; resetP.textContent = 'RESET PROGRESS';
+        updateMenuText();
+      } else
+      {
+        resetP.dataset.arm = '1'; resetP.textContent = 'TAP AGAIN TO CONFIRM';
+        setTimeout(() => { resetP.dataset.arm = ''; resetP.textContent = 'RESET PROGRESS'; }, 2500);
+      }
+    });
+
+    /* ================= boot ================= */
+    pCalm.textContent = 'MOTION: ' + (calm ? 'CALM' : 'FULL');
+    resize();
+    let rzT = null;
+    window.addEventListener('resize', () => {
+      resize();
+      clearTimeout(rzT);
+      rzT = setTimeout(() => {
+        if (courseDef && mode !== 'menu' && mode !== 'editor' && !checkSolvable(courseDef).ok)
+        {
+          courseDef = repairDef(courseDef);
+          layoutCourse();
+        } else if (mode === 'editor' && ed.def) { edSync(); }
+      }, 260);
+    });
+    menuInit();
+    updateMenuText();
+    if (document.fonts) { document.fonts.load('800 100px "Bricolage Grotesque"'); document.fonts.load('700 16px "Space Mono"'); }
+    setTimeout(() => {
+      let fails = 0;
+      COURSES.forEach(c => { const v = checkSolvable(c); if (v.ok) c.paths = v.paths; else fails++; });
+      console.info(fails
+        ? 'RICOCHET solver · ' + fails + '/' + TOUR_LEN + ' tour puzzles would be auto-repaired on this screen size'
+        : 'RICOCHET solver · all ' + TOUR_LEN + ' tour puzzles verified on this screen');
+    }, 600);
+    let last = performance.now();
+    function frame(now) {
+      const dt = Math.min((now - last) / 1000, 0.05); last = now;
+      update(dt); render();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  </script>
+</body>
+
+</html>
